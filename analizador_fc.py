@@ -5,8 +5,12 @@ import plotly.graph_objects as go
 from collections import defaultdict
 import math
 
+
+# Definir emoji de estrella
+STAR_EMOJI = "⭐" 
+
 # --- Configuración de la Página de Streamlit ---
-st.set_page_config(page_title="Calculadora Stats FC25 v3.0", layout="wide")
+st.set_page_config(page_title="Calculadora Stats FC25 v3.1", layout="wide")
 
 # --- Definiciones Constantes ---
 BASE_WF, BASE_SM, MAX_STARS, MAX_STAT_VAL = 2, 3, 5, 99
@@ -29,7 +33,6 @@ ALL_POSSIBLE_STAT_BOOST_COLS = IGS_SUB_STATS + ['PIERNA_MALA', 'FILIGRANAS']
 
 # --- Lógica de AcceleRATE ---
 def determinar_estilo_carrera(altura, agilidad, fuerza, aceleracion):
-    # ... (igual que en v2.9) ...
     try: altura, agilidad, fuerza, aceleracion = int(altura), int(agilidad), int(fuerza), int(aceleracion)
     except (ValueError, TypeError): return "N/A"
     agilidad_vs_fuerza, fuerza_vs_agilidad = agilidad - fuerza, fuerza - agilidad
@@ -44,7 +47,6 @@ def determinar_estilo_carrera(altura, agilidad, fuerza, aceleracion):
 # --- Carga y Preparación de Datos Base ---
 @st.cache_data
 def cargar_y_preparar_datos_base():
-    # ... (igual que en v2.9) ...
     file_altura, file_peso, file_posiciones = "Datos FC25 - ALTURA.csv", "Datos FC25 - PESO.csv", "Datos FC25 - POSICIONES.csv"
     try:
         df_altura_raw, df_peso_raw, df_posiciones_raw = pd.read_csv(file_altura), pd.read_csv(file_peso), pd.read_csv(file_posiciones)
@@ -73,7 +75,6 @@ def cargar_y_preparar_datos_base():
 # --- Carga y Preparación del Árbol de Habilidades ---
 @st.cache_data
 def cargar_arbol_habilidades():
-    # ... (igual que en v2.9) ...
     skill_tree_file = "ARBOL DE HABILIDAD - ARBOL.csv"
     try:
         df_skill_trees = pd.read_csv(skill_tree_file)
@@ -84,14 +85,13 @@ def cargar_arbol_habilidades():
         if 'Prerrequisito' in df_skill_trees.columns: df_skill_trees['Prerrequisito'] = df_skill_trees['Prerrequisito'].fillna('').astype(str)
         for col_extra in ['ID_Nodo', 'Arbol', 'Nombre_Visible', 'PlayStyle', 'Es_Arquetipo', 'Notas', 'Puntos_Req_Arbol']:
             if col_extra in df_skill_trees.columns: df_skill_trees[col_extra] = df_skill_trees[col_extra].astype(str).fillna('')
-            else: df_skill_trees[col_extra] = '' # Añadir columna si no existe para evitar KeyErrors más adelante
+            else: df_skill_trees[col_extra] = '' 
         return df_skill_trees
     except FileNotFoundError: st.error(f"ERROR: No se encontró '{skill_tree_file}'."); return None
     except Exception as e: st.error(f"Error al cargar CSV del árbol de hab: {e}"); return None
 
 # --- Función de Cálculo de Estadísticas Base (sin árbol) ---
 def calcular_stats_base_jugador(pos_sel, alt_sel, peso_sel, base_ref_stats, mod_alt_df, mod_peso_df, diff_pos_df):
-    # ... (igual que en v2.9) ...
     diff = diff_pos_df.loc[pos_sel]; mod_a = mod_alt_df.loc[alt_sel]; mod_p = mod_peso_df.loc[peso_sel]
     final_base_stats = base_ref_stats.add(diff).add(mod_a).add(mod_p)
     return final_base_stats.round().astype(int)
@@ -99,7 +99,6 @@ def calcular_stats_base_jugador(pos_sel, alt_sel, peso_sel, base_ref_stats, mod_
 # --- Pre-cálculo de todas las combinaciones base ---
 @st.cache_data
 def precompute_all_base_stats(_base_ref_stats, _mod_alt_df, _mod_peso_df, _diff_pos_df, _stat_cols_order):
-    # ... (igual que en v2.9) ...
     all_data = []; 
     if not all(isinstance(df, (pd.DataFrame, pd.Series)) for df in [_base_ref_stats, _mod_alt_df, _mod_peso_df, _diff_pos_df]): return pd.DataFrame()
     for pos in _diff_pos_df.index:
@@ -116,7 +115,6 @@ def precompute_all_base_stats(_base_ref_stats, _mod_alt_df, _mod_peso_df, _diff_
 
 # --- Funciones Auxiliares para el Editor de Habilidades ---
 def aplicar_mejoras_habilidad(stats_jugador_base, df_skill_tree_data, unlocked_nodes_ids, altura_jugador_actual):
-    # ... (igual que en v2.9 - con recálculo de IGS, Main Cats, y tope de 99) ...
     stats_modificadas = stats_jugador_base.copy().astype(float) 
     current_wf, current_sm = float(BASE_WF), float(BASE_SM)
     total_igs_boost_from_skills = 0 
@@ -150,7 +148,6 @@ def aplicar_mejoras_habilidad(stats_jugador_base, df_skill_tree_data, unlocked_n
     return pd.Series(stats_final_dict, name=stats_modificadas.name if hasattr(stats_modificadas, 'name') else None)
 
 def check_prerequisites(node_id, df_skill_tree_data, unlocked_nodes_ids):
-    # ... (igual que en v2.8) ...
     if node_id not in df_skill_tree_data['ID_Nodo'].values: return False
     node_info = df_skill_tree_data[df_skill_tree_data['ID_Nodo'] == node_id].iloc[0]
     prereqs_str = node_info.get('Prerrequisito', '')
@@ -159,10 +156,9 @@ def check_prerequisites(node_id, df_skill_tree_data, unlocked_nodes_ids):
     return any(pr_id.strip() in unlocked_nodes_ids for pr_id in prereq_ids)
 
 # --- Carga de Datos Principal ---
-APP_VERSION = "v3.0" 
+APP_VERSION = "v3.1" 
 if 'app_version' not in st.session_state or st.session_state.app_version != APP_VERSION:
     st.session_state.clear(); st.session_state.app_version = APP_VERSION
-# ... (resto de lógica de carga y session_state igual que v2.8) ...
 carga_base_exitosa = False
 datos_base_cargados = cargar_y_preparar_datos_base()
 df_skill_trees_global = cargar_arbol_habilidades()
@@ -178,14 +174,30 @@ if carga_base_exitosa:
     if 'bc_points_total' not in st.session_state: st.session_state.bc_points_total = TOTAL_SKILL_POINTS
     if 'bc_points_remaining' not in st.session_state: st.session_state.bc_points_remaining = TOTAL_SKILL_POINTS
     if 'next_filter_id' not in st.session_state: st.session_state.next_filter_id = 0
-    default_pos = lista_posiciones[lista_posiciones.index('ST') if 'ST' in lista_posiciones else 0]
-    unique_alts_sb_init_v30 = sorted(modificadores_altura.index.unique().tolist())
-    default_alt = unique_alts_sb_init_v30[unique_alts_sb_init_v30.index(180) if 180 in unique_alts_sb_init_v30 else 0]
-    unique_pesos_sb_init_v30 = sorted(modificadores_peso.index.unique().tolist())
-    default_pes = unique_pesos_sb_init_v30[unique_pesos_sb_init_v30.index(75) if 75 in unique_pesos_sb_init_v30 else 0]
-    if 'bc_pos' not in st.session_state: st.session_state.bc_pos = default_pos
-    if 'bc_alt' not in st.session_state: st.session_state.bc_alt = default_alt
-    if 'bc_pes' not in st.session_state: st.session_state.bc_pes = default_pes
+    
+    # Asegurar que lista_posiciones y otros índices estén disponibles para los defaults
+    # Si lista_posiciones está vacía o modificadores_altura/peso están vacíos, esto podría fallar
+    # Se asume que cargar_y_preparar_datos_base los llena correctamente
+    
+    # Intentar inicializar con valores por defecto más robustos
+    try:
+        default_pos_val = sorted(lista_posiciones)[sorted(lista_posiciones).index('ST') if 'ST' in sorted(lista_posiciones) else 0] if lista_posiciones else "ST" # Fallback
+    except: default_pos_val = "ST" # Fallback genérico
+        
+    try:
+        unique_alts_sb_init_v31 = sorted(modificadores_altura.index.unique().tolist())
+        default_alt_val = unique_alts_sb_init_v31[unique_alts_sb_init_v31.index(180) if 180 in unique_alts_sb_init_v31 else 0] if unique_alts_sb_init_v31 else 180
+    except: default_alt_val = 180
+
+    try:
+        unique_pesos_sb_init_v31 = sorted(modificadores_peso.index.unique().tolist())
+        default_pes_val = unique_pesos_sb_init_v31[unique_pesos_sb_init_v31.index(75) if 75 in unique_pesos_sb_init_v31 else 0] if unique_pesos_sb_init_v31 else 75
+    except: default_pes_val = 75
+
+
+    if 'bc_pos' not in st.session_state: st.session_state.bc_pos = default_pos_val
+    if 'bc_alt' not in st.session_state: st.session_state.bc_alt = default_alt_val
+    if 'bc_pes' not in st.session_state: st.session_state.bc_pes = default_pes_val
 else: st.stop()
 
 # --- Interfaz de Usuario con Streamlit ---
@@ -197,14 +209,14 @@ def highlight_max_in_row(row):
     if row.dtype == 'object': return ['' for _ in row]
     if row.isnull().all(): return ['' for _ in row]
     try: max_val = row.max()
-    except TypeError: return ['' for _ in row] # Evitar error con tipos mixtos no comparables
+    except TypeError: return ['' for _ in row]
     return ['background-color: #d4edda; color: #155724; font-weight: bold;' if (pd.notna(v) and v == max_val) else '' for v in row]
 
 def styled_metric(label, value):
     val_num = 0; apply_color_coding = label in MAIN_CATEGORIES
     if isinstance(value, (int, float)): val_num = value
     elif isinstance(value, str):
-        try: val_num = float(value.replace('⭐','')) # Intentar quitar estrellas si es WF/SM
+        try: val_num = float(value.replace('⭐',''))
         except ValueError: pass
     bg_color, text_color = "inherit", "inherit" 
     if apply_color_coding and val_num > 0 :
@@ -215,16 +227,22 @@ def styled_metric(label, value):
         <div style="font-size: 0.8em; {"color: #555555;" if bg_color == "inherit" else ""}">{label}</div>
         <div style="font-size: 1.7em; font-weight: bold;">{value}</div></div>""", unsafe_allow_html=True)
 
+# --- Selectores de Perfil Base para Build Craft en la Barra Lateral (CORREGIDO) ---
 st.sidebar.markdown("--- \n ### 🛠️ Perfil Base para Build Craft:")
-# ... (selectores de sidebar igual que v2.8, usando keys _v30) ...
-current_bc_pos_idx_sb_v30 = lista_posiciones.index(st.session_state.bc_pos) if st.session_state.bc_pos in lista_posiciones else 0
-st.session_state.bc_pos = st.sidebar.selectbox("Posición Base (BC):", sorted(lista_posiciones), index=current_bc_pos_idx_sb_v30, key="sb_bc_pos_v30")
-unique_alts_sb_ui_v30 = sorted(modificadores_altura.index.unique().tolist())
-current_bc_alt_idx_sb_v30 = unique_alts_sb_ui_v30.index(st.session_state.bc_alt) if st.session_state.bc_alt in unique_alts_sb_ui_v30 else 0
-st.session_state.bc_alt = st.sidebar.selectbox("Altura Base (cm) (BC):", unique_alts_sb_ui_v30, index=current_bc_alt_idx_sb_v30, key="sb_bc_alt_v30")
-unique_pesos_sb_ui_v30 = sorted(modificadores_peso.index.unique().tolist())
-current_bc_pes_idx_sb_v30 = unique_pesos_sb_ui_v30.index(st.session_state.bc_pes) if st.session_state.bc_pes in unique_pesos_sb_ui_v30 else 0
-st.session_state.bc_pes = st.sidebar.selectbox("Peso Base (kg) (BC):", unique_pesos_sb_ui_v30, index=current_bc_pes_idx_sb_v30, key="sb_bc_pes_v30")
+# Preparar listas ordenadas para los selectores
+sorted_lista_posiciones_sb = sorted(lista_posiciones)
+unique_alts_sb_ui_v31 = sorted(modificadores_altura.index.unique().tolist())
+unique_pesos_sb_ui_v31 = sorted(modificadores_peso.index.unique().tolist())
+
+# Calcular índices basados en las listas ordenadas
+current_bc_pos_idx_sb_v31 = sorted_lista_posiciones_sb.index(st.session_state.bc_pos) if st.session_state.bc_pos in sorted_lista_posiciones_sb else 0
+st.session_state.bc_pos = st.sidebar.selectbox("Posición Base (BC):", sorted_lista_posiciones_sb, index=current_bc_pos_idx_sb_v31, key="sb_bc_pos_v31")
+
+current_bc_alt_idx_sb_v31 = unique_alts_sb_ui_v31.index(st.session_state.bc_alt) if st.session_state.bc_alt in unique_alts_sb_ui_v31 else 0
+st.session_state.bc_alt = st.sidebar.selectbox("Altura Base (cm) (BC):", unique_alts_sb_ui_v31, index=current_bc_alt_idx_sb_v31, key="sb_bc_alt_v31")
+
+current_bc_pes_idx_sb_v31 = unique_pesos_sb_ui_v31.index(st.session_state.bc_pes) if st.session_state.bc_pes in unique_pesos_sb_ui_v31 else 0
+st.session_state.bc_pes = st.sidebar.selectbox("Peso Base (kg) (BC):", unique_pesos_sb_ui_v31, index=current_bc_pes_idx_sb_v31, key="sb_bc_pes_v31")
 
 
 tab_calc, tab_build_craft, tab_best_combo, tab_filters = st.tabs([
@@ -233,301 +251,320 @@ tab_calc, tab_build_craft, tab_best_combo, tab_filters = st.tabs([
 
 # --- Pestaña: Calculadora y Comparador ---
 with tab_calc:
-    # ... (código igual que v2.8, con keys _v30) ...
+    # ... (código igual que v3.0, solo actualizando keys si es necesario, y usando listas ordenadas para selectores)
     st.header("Calculadora de Estadísticas y Comparador (Stats Base)")
-    num_players_to_compare = st.radio("Jugadores a definir/comparar:", (1, 2, 3), index=0, horizontal=True, key="num_players_radio_v30_calc")
+    num_players_to_compare = st.radio("Jugadores a definir/comparar:", (1, 2, 3), index=0, horizontal=True, key="num_players_radio_v31_calc")
     cols_selectors_calc = st.columns(num_players_to_compare)
     player_stats_list_base_calc, player_configs_base_calc = [], []
+
+    # Usar las mismas listas ordenadas para los selectores de esta pestaña
+    # (sorted_lista_posiciones_sb, unique_alts_sb_ui_v31, unique_pesos_sb_ui_v31)
+
     for i in range(num_players_to_compare):
         with cols_selectors_calc[i]:
             player_label = f"JUG {chr(65+i)}"
             st.subheader(player_label)
-            pos_key, alt_key, pes_key = f"pos_p{i}_v30_calc", f"alt_p{i}_v30_calc", f"pes_p{i}_v30_calc"
-            if pos_key not in st.session_state: st.session_state[pos_key] = lista_posiciones[0]
-            if alt_key not in st.session_state: st.session_state[alt_key] = unique_alts_sb_ui_v30[0]
-            if pes_key not in st.session_state: st.session_state[pes_key] = unique_pesos_sb_ui_v30[0]
-            pos_val_c,alt_val_c,pes_val_c = st.selectbox(f"Pos ({player_label}):", sorted(lista_posiciones), key=pos_key), st.selectbox(f"Alt ({player_label}):", unique_alts_sb_ui_v30, key=alt_key), st.selectbox(f"Pes ({player_label}):", unique_pesos_sb_ui_v30, key=pes_key)
+            pos_key, alt_key, pes_key = f"pos_p{i}_v31_calc", f"alt_p{i}_v31_calc", f"pes_p{i}_v31_calc"
+            
+            # Mantener el estado de cada selector individualmente
+            if pos_key not in st.session_state: st.session_state[pos_key] = sorted_lista_posiciones_sb[0]
+            if alt_key not in st.session_state: st.session_state[alt_key] = unique_alts_sb_ui_v31[0]
+            if pes_key not in st.session_state: st.session_state[pes_key] = unique_pesos_sb_ui_v31[0]
+            
+            pos_val_c = st.selectbox(f"Pos ({player_label}):", sorted_lista_posiciones_sb, 
+                                     index=sorted_lista_posiciones_sb.index(st.session_state[pos_key]) if st.session_state[pos_key] in sorted_lista_posiciones_sb else 0, 
+                                     key=pos_key)
+            alt_val_c = st.selectbox(f"Alt ({player_label}):", unique_alts_sb_ui_v31, 
+                                     index=unique_alts_sb_ui_v31.index(st.session_state[alt_key]) if st.session_state[alt_key] in unique_alts_sb_ui_v31 else 0, 
+                                     key=alt_key)
+            pes_val_c = st.selectbox(f"Pes ({player_label}):", unique_pesos_sb_ui_v31, 
+                                     index=unique_pesos_sb_ui_v31.index(st.session_state[pes_key]) if st.session_state[pes_key] in unique_pesos_sb_ui_v31 else 0, 
+                                     key=pes_key)
+            
             player_configs_base_calc.append({'pos': pos_val_c, 'alt': alt_val_c, 'pes': pes_val_c, 'label': player_label})
             if pos_val_c and alt_val_c is not None and pes_val_c is not None:
                 stats = calcular_stats_base_jugador(pos_val_c, alt_val_c, pes_val_c, stats_base_lb_rb, modificadores_altura, modificadores_peso, diferenciales_posicion)
                 stats['AcceleRATE'] = determinar_estilo_carrera(alt_val_c, stats.get('AGI',0), stats.get('STR',0), stats.get('Acc',0))
                 player_stats_list_base_calc.append(stats)
-                if st.button(f"🛠️ Enviar a Build Craft ({player_label})", key=f"send_to_bc_calc_{i}_v30", help=f"Carga este perfil base ({pos_val_c}, {alt_val_c}cm, {pes_val_c}kg) en la pestaña 'Build Craft' y resetea los puntos de habilidad."):
+                if st.button(f"🛠️ Enviar a Build Craft ({player_label})", key=f"send_to_bc_calc_{i}_v31"):
                     st.session_state.bc_pos, st.session_state.bc_alt, st.session_state.bc_pes = pos_val_c, alt_val_c, pes_val_c
                     st.session_state.bc_unlocked_nodes, st.session_state.bc_points_remaining = set(), TOTAL_SKILL_POINTS
-                    st.success(f"Perfil de {player_label} enviado a Build Craft. (Pos: {pos_val_c}, Alt: {alt_val_c}cm, Pes: {pes_val_c}kg).")
+                    st.success(f"Perfil de {player_label} enviado. Ve a '🛠️ Build Craft'. (Sidebar actualizada)")
             else: player_stats_list_base_calc.append(None)
     st.divider(); st.subheader("Perfiles y Estadísticas (Base)")
+    # ... (resto de la lógica de visualización de Calculadora y Comparador igual que v3.0, usando _v31 para keys si es necesario)
+    # ... (y el Top 5 con sus botones "Enviar a Build Craft")
     if any(ps is not None for ps in player_stats_list_base_calc):
-        # ... (Lógica de visualización de radar y tabla comparativa como antes, pero usando los nombres de variable _v30)
-        fig_radar_comp_calc_disp_obj_v30 = go.Figure(); radar_attrs_calc_disp_list_val_v30 = MAIN_CATEGORIES 
-        cols_perfiles_calc_disp_list_val_v30 = st.columns(num_players_to_compare) 
-        for i, stats_item_calc_disp_val_v30 in enumerate(player_stats_list_base_calc): 
-            if stats_item_calc_disp_val_v30 is not None:
-                with cols_perfiles_calc_disp_list_val_v30[i]:
+        fig_radar_comp_calc_disp_obj_v31 = go.Figure(); radar_attrs_calc_disp_list_val_v31 = MAIN_CATEGORIES 
+        cols_perfiles_calc_disp_list_val_v31 = st.columns(num_players_to_compare) 
+        for i, stats_item_calc_disp_val_v31 in enumerate(player_stats_list_base_calc): 
+            if stats_item_calc_disp_val_v31 is not None:
+                with cols_perfiles_calc_disp_list_val_v31[i]:
                     st.markdown(f"**{player_configs_base_calc[i]['label']} ({player_configs_base_calc[i]['pos']}, {player_configs_base_calc[i]['alt']}cm, {player_configs_base_calc[i]['pes']}kg)**")
-                    styled_metric("Estilo de Carrera", stats_item_calc_disp_val_v30.get('AcceleRATE', "N/A"))
-                valid_radar_attrs_calc_disp_list_val_set_v30 = [attr for attr in radar_attrs_calc_disp_list_val_v30 if attr in stats_item_calc_disp_val_v30.index] 
-                radar_values_calc_disp_list_val_set_v30 = [stats_item_calc_disp_val_v30.get(attr, 0) for attr in valid_radar_attrs_calc_disp_list_val_set_v30] 
-                if len(valid_radar_attrs_calc_disp_list_val_set_v30) >= 3:
-                    fig_radar_comp_calc_disp_obj_v30.add_trace(go.Scatterpolar(r=radar_values_calc_disp_list_val_set_v30, theta=valid_radar_attrs_calc_disp_list_val_set_v30, fill='toself', name=f"{player_configs_base_calc[i]['label']} ({player_configs_base_calc[i]['pos']})",line_color=PLAYER_COLORS[i % len(PLAYER_COLORS)],fillcolor=PLAYER_FILL_COLORS[i % len(PLAYER_FILL_COLORS)]))
-        if fig_radar_comp_calc_disp_obj_v30.data:
-            fig_radar_comp_calc_disp_obj_v30.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])), title="Comparativa de Perfiles Base")
-            st.plotly_chart(fig_radar_comp_calc_disp_obj_v30, use_container_width=True)
-        valid_player_stats_b_calc_display_list_final_v30 = [ps for ps in player_stats_list_base_calc if ps is not None] 
-        valid_player_col_names_b_calc_disp_list_final_v30 = [player_configs_base_calc[i]['label'] for i, ps in enumerate(player_stats_list_base_calc) if ps is not None] 
-        if len(valid_player_stats_b_calc_display_list_final_v30) > 1 :
-            compare_dict_b_calc_display_dict_final_v30 = {name: stats.drop('AcceleRATE', errors='ignore') for name, stats in zip(valid_player_col_names_b_calc_disp_list_final_v30, valid_player_stats_b_calc_display_list_final_v30)} 
-            df_compare_b_calc_display_df_final_v30 = pd.DataFrame(compare_dict_b_calc_display_dict_final_v30) 
-            df_compare_styled_b_calc_display_df_final_v30 = df_compare_b_calc_display_df_final_v30.style.apply(highlight_max_in_row, axis=1) 
+                    styled_metric("Estilo de Carrera", stats_item_calc_disp_val_v31.get('AcceleRATE', "N/A"))
+                valid_radar_attrs_calc_disp_list_val_set_v31 = [attr for attr in radar_attrs_calc_disp_list_val_v31 if attr in stats_item_calc_disp_val_v31.index] 
+                radar_values_calc_disp_list_val_set_v31 = [stats_item_calc_disp_val_v31.get(attr, 0) for attr in valid_radar_attrs_calc_disp_list_val_set_v31] 
+                if len(valid_radar_attrs_calc_disp_list_val_set_v31) >= 3:
+                    fig_radar_comp_calc_disp_obj_v31.add_trace(go.Scatterpolar(r=radar_values_calc_disp_list_val_set_v31, theta=valid_radar_attrs_calc_disp_list_val_set_v31, fill='toself', name=f"{player_configs_base_calc[i]['label']} ({player_configs_base_calc[i]['pos']})",line_color=PLAYER_COLORS[i % len(PLAYER_COLORS)],fillcolor=PLAYER_FILL_COLORS[i % len(PLAYER_FILL_COLORS)]))
+        if fig_radar_comp_calc_disp_obj_v31.data:
+            fig_radar_comp_calc_disp_obj_v31.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])), title="Comparativa de Perfiles Base")
+            st.plotly_chart(fig_radar_comp_calc_disp_obj_v31, use_container_width=True)
+        
+        valid_player_stats_b_calc_display_list_final_v31 = [ps for ps in player_stats_list_base_calc if ps is not None] 
+        valid_player_col_names_b_calc_disp_list_final_v31 = [player_configs_base_calc[i]['label'] for i, ps in enumerate(player_stats_list_base_calc) if ps is not None] 
+        if len(valid_player_stats_b_calc_display_list_final_v31) > 1 :
+            compare_dict_b_calc_display_dict_final_v31 = {name: stats.drop('AcceleRATE', errors='ignore') for name, stats in zip(valid_player_col_names_b_calc_disp_list_final_v31, valid_player_stats_b_calc_display_list_final_v31)} 
+            df_compare_b_calc_display_df_final_v31 = pd.DataFrame(compare_dict_b_calc_display_dict_final_v31) 
+            df_compare_styled_b_calc_display_df_final_v31 = df_compare_b_calc_display_df_final_v31.style.apply(highlight_max_in_row, axis=1) 
             st.subheader("Tabla Comparativa de Estadísticas Base (Numéricas)")
-            st.dataframe(df_compare_styled_b_calc_display_df_final_v30)
-            accele_rates_info_calc_val_final_v30 = {name: player_stats_list_base_calc[j].get('AcceleRATE', 'N/A') for j, name in enumerate(valid_player_col_names_b_calc_disp_list_final_v30)} 
-            st.caption(f"Estilos de Carrera: {accele_rates_info_calc_val_final_v30}")
-        elif len(valid_player_stats_b_calc_display_list_final_v30) == 1:
+            st.dataframe(df_compare_styled_b_calc_display_df_final_v31)
+            accele_rates_info_calc_val_final_v31 = {name: player_stats_list_base_calc[j].get('AcceleRATE', 'N/A') for j, name in enumerate(valid_player_col_names_b_calc_disp_list_final_v31)} 
+            st.caption(f"Estilos de Carrera: {accele_rates_info_calc_val_final_v31}")
+        elif len(valid_player_stats_b_calc_display_list_final_v31) == 1:
             st.subheader(f"Estadísticas Detalladas Base: {player_configs_base_calc[0]['label']}")
-            stats_to_display_single_calc_final_v30 = valid_player_stats_b_calc_display_list_final_v30[0] 
-            accele_rate_single_calc_final_v30 = stats_to_display_single_calc_final_v30.get('AcceleRATE', 'N/A')
-            styled_metric("Estilo de Carrera", accele_rate_single_calc_final_v30)
-            st.dataframe(stats_to_display_single_calc_final_v30.drop('AcceleRATE', errors='ignore').rename("Valor").astype(str))
+            stats_to_display_single_calc_final_v31 = valid_player_stats_b_calc_display_list_final_v31[0] 
+            accele_rate_single_calc_final_v31 = stats_to_display_single_calc_final_v31.get('AcceleRATE', 'N/A')
+            styled_metric("Estilo de Carrera", accele_rate_single_calc_final_v31)
+            st.dataframe(stats_to_display_single_calc_final_v31.drop('AcceleRATE', errors='ignore').rename("Valor").astype(str))
         
         st.divider(); st.header("🏆 Top 5 Combinaciones por IGS (Stats Base)")
         if not all_stats_df_base.empty and 'IGS' in all_stats_df_base.columns:
-            all_stats_df_base_display_top5_calc_final_v30 = all_stats_df_base.copy()
-            all_stats_df_base_display_top5_calc_final_v30['IGS'] = pd.to_numeric(all_stats_df_base_display_top5_calc_final_v30['IGS'], errors='coerce').fillna(0)
-            if 'AcceleRATE' not in all_stats_df_base_display_top5_calc_final_v30.columns:
-                 all_stats_df_base_display_top5_calc_final_v30['AcceleRATE'] = all_stats_df_base_display_top5_calc_final_v30.apply(lambda r: determinar_estilo_carrera(r['Altura'], r.get('AGI',0),r.get('STR',0),r.get('Acc',0)), axis=1)
-            top_5_igs_calc_df_final_v30 = all_stats_df_base_display_top5_calc_final_v30.sort_values(by='IGS', ascending=False).head(5)
-            st.dataframe(top_5_igs_calc_df_final_v30[['Posicion', 'Altura', 'Peso', 'AcceleRATE', 'IGS']])
-            for i, row_idx in enumerate(top_5_igs_calc_df_final_v30.index):
-                row = top_5_igs_calc_df_final_v30.loc[row_idx]
-                if st.button(f"🛠️ Editar {row['Posicion']} {row['Altura']}cm {row['Peso']}kg (Top {i+1})", key=f"send_to_bc_top5_{row_idx}_v30"):
+            all_stats_df_base_display_top5_calc_final_v31 = all_stats_df_base.copy()
+            all_stats_df_base_display_top5_calc_final_v31['IGS'] = pd.to_numeric(all_stats_df_base_display_top5_calc_final_v31['IGS'], errors='coerce').fillna(0)
+            if 'AcceleRATE' not in all_stats_df_base_display_top5_calc_final_v31.columns:
+                 all_stats_df_base_display_top5_calc_final_v31['AcceleRATE'] = all_stats_df_base_display_top5_calc_final_v31.apply(lambda r: determinar_estilo_carrera(r['Altura'], r.get('AGI',0),r.get('STR',0),r.get('Acc',0)), axis=1)
+            top_5_igs_calc_df_final_v31 = all_stats_df_base_display_top5_calc_final_v31.sort_values(by='IGS', ascending=False).head(5)
+            st.dataframe(top_5_igs_calc_df_final_v31[['Posicion', 'Altura', 'Peso', 'AcceleRATE', 'IGS']])
+            for i, row_idx in enumerate(top_5_igs_calc_df_final_v31.index):
+                row = top_5_igs_calc_df_final_v31.loc[row_idx]
+                if st.button(f"🛠️ Editar {row['Posicion']} {row['Altura']}cm {row['Peso']}kg (Top {i+1})", key=f"send_to_bc_top5_{row_idx}_v31"):
                     st.session_state.bc_pos, st.session_state.bc_alt, st.session_state.bc_pes = row['Posicion'], row['Altura'], row['Peso']
                     st.session_state.bc_unlocked_nodes, st.session_state.bc_points_remaining = set(), TOTAL_SKILL_POINTS
                     st.success(f"Perfil Top {i+1} ({row['Posicion']}) enviado. Ajusta selectores en sidebar y ve a '🛠️ Build Craft'.")
         else: st.warning("Datos para el Top 5 (base) no disponibles.")
     else: st.info("Define parámetros de al menos un jugador para ver stats base.")
 
+
 # --- Pestaña: Build Craft ---
 with tab_build_craft:
-    # ... (código igual que v2.8, con la nueva tabla de impacto de árbol y visualización de nodos mejorada, y actualizando keys) ...
+    # ... (código igual que v2.8, con la nueva tabla de impacto de árbol, visualización de nodos mejorada y Resumen de Build, actualizando keys) ...
     st.header(f"🛠️ Build Craft: {st.session_state.bc_pos} | {st.session_state.bc_alt}cm | {st.session_state.bc_pes}kg")
     jugador_base_actual_bc = calcular_stats_base_jugador(st.session_state.bc_pos, st.session_state.bc_alt, st.session_state.bc_pes, stats_base_lb_rb, modificadores_altura, modificadores_peso, diferenciales_posicion)
     stats_con_skills_bc = aplicar_mejoras_habilidad(jugador_base_actual_bc, df_skill_trees_global, st.session_state.bc_unlocked_nodes, st.session_state.bc_alt)
     
     st.subheader("Perfil Actual del Build")
-    col_bc_info_main_craft_disp_v30, col_bc_radar_display_craft_disp_v30 = st.columns([1,1]) 
-    with col_bc_info_main_craft_disp_v30:
+    # ... (Panel de información principal con styled_metric igual que v2.8, actualizando keys) ...
+    col_bc_info_main_craft_disp_v31, col_bc_radar_display_craft_disp_v31 = st.columns([1,1]) 
+    with col_bc_info_main_craft_disp_v31:
         styled_metric("Puntos Restantes", f"{st.session_state.bc_points_remaining} / {TOTAL_SKILL_POINTS}")
-        wf_stars_val_bc_disp_v30 = int(stats_con_skills_bc.get('PIERNA_MALA', BASE_WF)) 
-        sm_stars_val_bc_disp_v30 = int(stats_con_skills_bc.get('FILIGRANAS', BASE_SM))
-        styled_metric("Pierna Mala (WF)", "⭐" * wf_stars_val_bc_disp_v30)
-        styled_metric("Filigranas (SM)", "⭐" * sm_stars_val_bc_disp_v30)
+        wf_stars_val_bc_disp_v31 = int(stats_con_skills_bc.get('PIERNA_MALA', BASE_WF)) 
+        sm_stars_val_bc_disp_v31 = int(stats_con_skills_bc.get('FILIGRANAS', BASE_SM))
+        styled_metric("Pierna Mala (WF)", "⭐" * wf_stars_val_bc_disp_v31)
+        styled_metric("Filigranas (SM)", "⭐" * sm_stars_val_bc_disp_v31)
         styled_metric("Estilo de Carrera", str(stats_con_skills_bc.get('AcceleRATE', "N/A")))
         styled_metric("IGS (Con Habilidades)", f"{int(stats_con_skills_bc.get('IGS', 0))}")
         st.markdown("---"); st.markdown("**Atributos Generales (Recalculados):**")
-        cols_main_stats_bc_display_list_v30 = st.columns(2) 
+        cols_main_stats_bc_display_list_v31 = st.columns(2) 
         for idx, stat_name in enumerate(MAIN_CATEGORIES):
-            with cols_main_stats_bc_display_list_v30[idx % 2]:
+            with cols_main_stats_bc_display_list_v31[idx % 2]:
                 styled_metric(stat_name, int(stats_con_skills_bc.get(stat_name, 0)))
-    with col_bc_radar_display_craft_disp_v30:
-        radar_attrs_bc_disp_list_val_v30 = MAIN_CATEGORIES 
-        valid_radar_attrs_bc_disp_list_val_set_v30 = [attr for attr in radar_attrs_bc_disp_list_val_v30 if attr in stats_con_skills_bc.index] 
-        radar_values_bc_disp_list_val_set_v30 = [stats_con_skills_bc.get(attr,0) for attr in valid_radar_attrs_bc_disp_list_val_set_v30] 
-        if len(valid_radar_attrs_bc_disp_list_val_set_v30) >=3:
-            fig_radar_bc_disp_obj_val_v30 = go.Figure() 
-            fig_radar_bc_disp_obj_val_v30.add_trace(go.Scatterpolar(r=radar_values_bc_disp_list_val_set_v30, theta=valid_radar_attrs_bc_disp_list_val_set_v30, fill='toself', name="Con Habilidades", line_color=PLAYER_COLORS[0]))
-            fig_radar_bc_disp_obj_val_v30.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])), title="Perfil Actual del Build")
-            st.plotly_chart(fig_radar_bc_disp_obj_val_v30, use_container_width=True)
+    with col_bc_radar_display_craft_disp_v31:
+        # ... (código del radar igual) ...
+        radar_attrs_bc_disp_list_val_v31 = MAIN_CATEGORIES 
+        valid_radar_attrs_bc_disp_list_val_set_v31 = [attr for attr in radar_attrs_bc_disp_list_val_v31 if attr in stats_con_skills_bc.index] 
+        radar_values_bc_disp_list_val_set_v31 = [stats_con_skills_bc.get(attr,0) for attr in valid_radar_attrs_bc_disp_list_val_set_v31] 
+        if len(valid_radar_attrs_bc_disp_list_val_set_v31) >=3:
+            fig_radar_bc_disp_obj_val_v31 = go.Figure() 
+            fig_radar_bc_disp_obj_val_v31.add_trace(go.Scatterpolar(r=radar_values_bc_disp_list_val_set_v31, theta=valid_radar_attrs_bc_disp_list_val_set_v31, fill='toself', name="Con Habilidades", line_color=PLAYER_COLORS[0]))
+            fig_radar_bc_disp_obj_val_v31.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])), title="Perfil Actual del Build")
+            st.plotly_chart(fig_radar_bc_disp_obj_val_v31, use_container_width=True)
 
     with st.expander("Ver todas las estadísticas del Build Actual (con habilidades)", expanded=False):
-        # Convertir Series a DataFrame de dos columnas para mejor visualización y evitar error Arrow
-        df_display_build_stats = pd.DataFrame(stats_con_skills_bc.astype(str)).reset_index()
-        df_display_build_stats.columns = ["Atributo", "Valor Build"]
-        st.dataframe(df_display_build_stats)
+        df_display_build_stats_v31 = pd.DataFrame(pd.Series(stats_con_skills_bc).astype(str)).reset_index() # Renombrar
+        df_display_build_stats_v31.columns = ["Atributo", "Valor Build"]
+        st.dataframe(df_display_build_stats_v31)
     
-    st.divider()
     # --- Sección para Resumen de Build para Copiar ---
-    if st.button("📋 Generar Resumen del Build para Copiar", key="btn_generate_summary_v30"):
-        summary_text = f"**Resumen del Build: {st.session_state.bc_pos} | {st.session_state.bc_alt}cm | {st.session_state.bc_pes}kg**\n\n"
-        summary_text += f"- **Puntos de Habilidad:** {TOTAL_SKILL_POINTS - st.session_state.bc_points_remaining} / {TOTAL_SKILL_POINTS} usados (Restantes: {st.session_state.bc_points_remaining})\n"
-        summary_text += f"- **Pierna Mala:** {int(stats_con_skills_bc.get('PIERNA_MALA', BASE_WF))} ⭐\n"
-        summary_text += f"- **Filigranas:** {int(stats_con_skills_bc.get('FILIGRANAS', BASE_SM))} ⭐\n"
-        summary_text += f"- **Estilo de Carrera (AcceleRATE):** {stats_con_skills_bc.get('AcceleRATE', 'N/A')}\n"
-        summary_text += f"- **IGS (Con Habilidades):** {int(stats_con_skills_bc.get('IGS', 0))}\n\n"
-        summary_text += "**Atributos Generales Finales:**\n"
-        for cat in MAIN_CATEGORIES:
-            summary_text += f"  - {cat}: {int(stats_con_skills_bc.get(cat, 0))}\n"
-        
-        summary_text += "\n**Nodos Desbloqueados:**\n"
-        unlocked_nodes_details = defaultdict(list)
-        playstyles_unlocked = []
-        for node_id in sorted(list(st.session_state.bc_unlocked_nodes)): # Ordenar para consistencia
-            if node_id in df_skill_trees_global['ID_Nodo'].values:
-                node_info = df_skill_trees_global[df_skill_trees_global['ID_Nodo'] == node_id].iloc[0]
-                unlocked_nodes_details[node_info['Arbol']].append(f"{node_info['Nombre_Visible']} (Costo: {node_info['Costo']})")
-                if 'PlayStyle' in node_info.index and pd.notna(node_info['PlayStyle']) and node_info['PlayStyle'] != '':
-                    playstyles_unlocked.append(node_info['PlayStyle'])
-        
-        for arbol_name, nodos_list in unlocked_nodes_details.items():
-            summary_text += f"  - **{arbol_name}:**\n"
-            for nodo_str in nodos_list:
-                summary_text += f"    - {nodo_str}\n"
-        
-        if playstyles_unlocked:
-            summary_text += "\n**PlayStyles Desbloqueados:**\n"
-            for ps_name in sorted(list(set(playstyles_unlocked))): # Únicos y ordenados
-                summary_text += f"  - {ps_name}\n"
-        
-        st.text_area("Copia este resumen:", summary_text, height=400, key="build_summary_text_area")
+    st.divider()
+    with st.expander("📋 Ver/Copiar Resumen del Build Actual", expanded=False):
+        if st.button("Generar Resumen de Texto", key="btn_generate_summary_v31"):
+            summary_text = f"**Resumen del Build: {st.session_state.bc_pos} | {st.session_state.bc_alt}cm | {st.session_state.bc_pes}kg**\n\n"
+            summary_text += f"- **Puntos de Habilidad:** {TOTAL_SKILL_POINTS - st.session_state.bc_points_remaining} / {TOTAL_SKILL_POINTS} usados (Restantes: {st.session_state.bc_points_remaining})\n"
+            summary_text += f"- **Pierna Mala:** {STAR_EMOJI * int(stats_con_skills_bc.get('PIERNA_MALA', BASE_WF))}\n"
+            summary_text += f"- **Filigranas:** {STAR_EMOJI * int(stats_con_skills_bc.get('FILIGRANAS', BASE_SM))}\n"
+            summary_text += f"- **Estilo de Carrera (AcceleRATE):** {stats_con_skills_bc.get('AcceleRATE', 'N/A')}\n"
+            summary_text += f"- **IGS (Con Habilidades):** {int(stats_con_skills_bc.get('IGS', 0))}\n\n"
+            summary_text += "**Atributos Generales Finales:**\n"
+            for cat in MAIN_CATEGORIES:
+                summary_text += f"  - {cat}: {int(stats_con_skills_bc.get(cat, 0))}\n"
+            summary_text += "\n**Nodos Desbloqueados:**\n"
+            unlocked_nodes_details = defaultdict(list)
+            playstyles_unlocked = []
+            # Ordenar nodos por árbol y luego por ID para un resumen consistente
+            sorted_unlocked_nodes = sorted(list(st.session_state.bc_unlocked_nodes), key=lambda x: (df_skill_trees_global[df_skill_trees_global['ID_Nodo'] == x].iloc[0]['Arbol'], x))
+            for node_id in sorted_unlocked_nodes:
+                if node_id in df_skill_trees_global['ID_Nodo'].values:
+                    node_info = df_skill_trees_global[df_skill_trees_global['ID_Nodo'] == node_id].iloc[0]
+                    unlocked_nodes_details[node_info['Arbol']].append(f"{node_info['Nombre_Visible']} (Costo: {node_info['Costo']})")
+                    # Usar .get() para PlayStyle por si la columna no existe o el valor es NaN/None/''
+                    playstyle_node = node_info.get('PlayStyle', '')
+                    if pd.notna(playstyle_node) and playstyle_node != '':
+                        playstyles_unlocked.append(playstyle_node)
+            for arbol_name_sum, nodos_list_sum in unlocked_nodes_details.items(): # Renombrar
+                summary_text += f"  - **{arbol_name_sum}:**\n"
+                for nodo_str_sum in nodos_list_sum: summary_text += f"    - {nodo_str_sum}\n" # Renombrar
+            if playstyles_unlocked:
+                summary_text += "\n**PlayStyles Desbloqueados:**\n"
+                for ps_name_sum in sorted(list(set(playstyles_unlocked))): summary_text += f"  - {ps_name_sum}\n" # Renombrar
+            st.text_area("Copia este resumen:", summary_text, height=400, key="build_summary_text_area_v31")
 
     st.subheader("Árboles de Habilidad para Personalizar")
-    # ... (resto de la pestaña Build Craft igual que v2.8, con la tabla de impacto mejorada y keys _v30) ...
-    col_tree_selector_bc_edit_ui_v30, col_tree_summary_bc_edit_ui_v30 = st.columns([1,2]) 
-    with col_tree_selector_bc_edit_ui_v30:
-        arbol_sel_bc_edit_val_v30 = st.selectbox("Selecciona Árbol:", options=["Todos"] + sorted(df_skill_trees_global['Arbol'].unique()), key="skill_tree_select_bc_v30") 
-        if st.button("Resetear Puntos de Habilidad", key="reset_skills_btn_bc_v30"):
+    # ... (resto de la pestaña Build Craft igual que v2.8, con la tabla de impacto mejorada y keys _v31) ...
+    col_tree_selector_bc_edit_ui_v31, col_tree_summary_bc_edit_ui_v31 = st.columns([1,2]) # Renombrar
+    with col_tree_selector_bc_edit_ui_v31:
+        arbol_sel_bc_edit_val_v31 = st.selectbox("Selecciona Árbol:", options=["Todos"] + sorted(df_skill_trees_global['Arbol'].unique()), key="skill_tree_select_bc_v31") # Renombrar
+        if st.button("Resetear Puntos de Habilidad", key="reset_skills_btn_bc_v31"):
             st.session_state.bc_unlocked_nodes, st.session_state.bc_points_remaining = set(), TOTAL_SKILL_POINTS
             st.rerun()
-    with col_tree_summary_bc_edit_ui_v30: 
-        if arbol_sel_bc_edit_val_v30 != "Todos":
-            st.markdown(f"**Impacto del Árbol '{arbol_sel_bc_edit_val_v30}' en Sub-Stats:**")
-            sub_stats_del_arbol_sel_actual_v30 = [] 
-            if arbol_sel_bc_edit_val_v30 in SUB_STATS_MAPPING:
-                sub_stats_del_arbol_sel_actual_v30 = SUB_STATS_MAPPING[arbol_sel_bc_edit_val_v30]
+    with col_tree_summary_bc_edit_ui_v31: 
+        if arbol_sel_bc_edit_val_v31 != "Todos":
+            st.markdown(f"**Impacto del Árbol '{arbol_sel_bc_edit_val_v31}' en Sub-Stats:**")
+            sub_stats_del_arbol_sel_actual_v31 = [] 
+            if arbol_sel_bc_edit_val_v31 in SUB_STATS_MAPPING:
+                sub_stats_del_arbol_sel_actual_v31 = SUB_STATS_MAPPING[arbol_sel_bc_edit_val_v31]
             else:
-                nodos_del_arbol_actual_df_v30 = df_skill_trees_global[df_skill_trees_global['Arbol'] == arbol_sel_bc_edit_val_v30]
-                stats_potencialmente_mejoradas_v30 = []
-                for s_col_v30 in IGS_SUB_STATS: 
-                    if s_col_v30 in nodos_del_arbol_actual_df_v30.columns and nodos_del_arbol_actual_df_v30[s_col_v30].sum() > 0:
-                        stats_potencialmente_mejoradas_v30.append(s_col_v30)
-                sub_stats_del_arbol_sel_actual_v30 = sorted(list(set(stats_potencialmente_mejoradas_v30))) 
-            summary_data_live_list_val_v30 = [] 
-            if sub_stats_del_arbol_sel_actual_v30:
-                boosts_solo_arbol_sel_dict_val_v30 = defaultdict(int) 
-                nodos_desbloq_en_arbol_actual_list_val_v30 = [nid for nid in st.session_state.bc_unlocked_nodes if df_skill_trees_global[df_skill_trees_global['ID_Nodo'] == nid].iloc[0]['Arbol'] == arbol_sel_bc_edit_val_v30] 
-                for node_id in nodos_desbloq_en_arbol_actual_list_val_v30:
+                nodos_del_arbol_actual_df_v31 = df_skill_trees_global[df_skill_trees_global['Arbol'] == arbol_sel_bc_edit_val_v31]
+                stats_potencialmente_mejoradas_v31 = []
+                for s_col_v31 in IGS_SUB_STATS: 
+                    if s_col_v31 in nodos_del_arbol_actual_df_v31.columns and nodos_del_arbol_actual_df_v31[s_col_v31].sum() > 0:
+                        stats_potencialmente_mejoradas_v31.append(s_col_v31)
+                sub_stats_del_arbol_sel_actual_v31 = sorted(list(set(stats_potencialmente_mejoradas_v31))) 
+            summary_data_live_list_val_v31 = [] 
+            if sub_stats_del_arbol_sel_actual_v31:
+                boosts_solo_arbol_sel_dict_val_v31 = defaultdict(int) 
+                nodos_desbloq_en_arbol_actual_list_val_v31 = [nid for nid in st.session_state.bc_unlocked_nodes if df_skill_trees_global[df_skill_trees_global['ID_Nodo'] == nid].iloc[0]['Arbol'] == arbol_sel_bc_edit_val_v31] 
+                for node_id in nodos_desbloq_en_arbol_actual_list_val_v31:
                     node_data = df_skill_trees_global[df_skill_trees_global['ID_Nodo'] == node_id].iloc[0]
-                    for col_stat_name in sub_stats_del_arbol_sel_actual_v30: 
+                    for col_stat_name in sub_stats_del_arbol_sel_actual_v31: 
                         if col_stat_name in node_data.index and node_data[col_stat_name] > 0:
-                            boosts_solo_arbol_sel_dict_val_v30[col_stat_name] += node_data[col_stat_name]
-                for stat_name in sub_stats_del_arbol_sel_actual_v30:
+                            boosts_solo_arbol_sel_dict_val_v31[col_stat_name] += node_data[col_stat_name]
+                for stat_name in sub_stats_del_arbol_sel_actual_v31:
                     base_val = jugador_base_actual_bc.get(stat_name, 0)
-                    total_boost_arbol = boosts_solo_arbol_sel_dict_val_v30.get(stat_name, 0)
+                    total_boost_arbol = boosts_solo_arbol_sel_dict_val_v31.get(stat_name, 0)
                     parcial_val = min(base_val + total_boost_arbol, MAX_STAT_VAL)
                     boost_display_str = f"<span style='color:green; font-weight:bold;'>+{total_boost_arbol}</span>" if total_boost_arbol > 0 else "+0"
-                    summary_data_live_list_val_v30.append({"Stat": stat_name, "Base": base_val, f"Boost ({arbol_sel_bc_edit_val_v30})": boost_display_str, "Resultado (con este árbol)": parcial_val}) # Columna "Total Build" eliminada
-                if summary_data_live_list_val_v30:
-                    df_summary_live_df_val_v30 = pd.DataFrame(summary_data_live_list_val_v30).set_index("Stat") 
-                    st.markdown(df_summary_live_df_val_v30.to_html(escape=False), unsafe_allow_html=True)
-                else: st.caption(f"No hay nodos desbloqueados o mejoras para las sub-stats de '{arbol_sel_bc_edit_val_v30}'.")
-            else: st.caption(f"No se definieron sub-stats para el árbol '{arbol_sel_bc_edit_val_v30}' o no hay nodos que las mejoren.")
+                    summary_data_live_list_val_v31.append({"Stat": stat_name, "Base": base_val, f"Boost ({arbol_sel_bc_edit_val_v31})": boost_display_str, "Resultado (con este árbol)": parcial_val})
+                if summary_data_live_list_val_v31:
+                    df_summary_live_df_val_v31 = pd.DataFrame(summary_data_live_list_val_v31).set_index("Stat") 
+                    st.markdown(df_summary_live_df_val_v31.to_html(escape=False), unsafe_allow_html=True)
+                else: st.caption(f"No hay nodos desbloqueados o mejoras para las sub-stats de '{arbol_sel_bc_edit_val_v31}'.")
+            else: st.caption(f"No se definieron sub-stats para el árbol '{arbol_sel_bc_edit_val_v31}' o no hay nodos que las mejoren.")
         else: st.caption("Selecciona un árbol para ver su impacto detallado.")
     
-    if arbol_sel_bc_edit_val_v30:
-        # ... (lógica de tiers y visualización de nodos como tarjeta igual que v2.8, actualizando keys _v30) ...
-        # (Esta parte es bastante larga, asumo que la lógica de tiers y el display de cada nodo en tarjeta se mantiene, solo actualizando las keys de los widgets con _v30)
-        # ... (Para brevedad, no repito toda la lógica de visualización de nodos aquí, pero debe estar presente y con keys actualizadas)
-        nodos_a_mostrar_bc_disp_v30 = df_skill_trees_global 
-        if arbol_sel_bc_edit_val_v30 != "Todos":
-            nodos_a_mostrar_bc_disp_v30 = df_skill_trees_global[df_skill_trees_global['Arbol'] == arbol_sel_bc_edit_val_v30]
-        st.markdown(f"**Nodos para '{arbol_sel_bc_edit_val_v30}':** ({len(nodos_a_mostrar_bc_disp_v30)} nodos)")
-        nodos_por_tier_bc_disp_v30 = defaultdict(list); processed_nodes_bc_disp_v30 = set() 
-        for _, nodo in nodos_a_mostrar_bc_disp_v30.iterrows(): 
+    if arbol_sel_bc_edit_val_v31:
+        # ... (lógica de tiers y visualización de nodos como tarjeta igual que v2.8, actualizando keys _v31)
+        nodos_a_mostrar_bc_disp_v31 = df_skill_trees_global 
+        if arbol_sel_bc_edit_val_v31 != "Todos":
+            nodos_a_mostrar_bc_disp_v31 = df_skill_trees_global[df_skill_trees_global['Arbol'] == arbol_sel_bc_edit_val_v31]
+        st.markdown(f"**Nodos para '{arbol_sel_bc_edit_val_v31}':** ({len(nodos_a_mostrar_bc_disp_v31)} nodos)")
+        # ... (resto de la lógica de tiers y display de nodos, asegurando que todas las variables locales tengan sufijos únicos si es necesario)
+        nodos_por_tier_bc_disp_v31 = defaultdict(list); processed_nodes_bc_disp_v31 = set() 
+        for _, nodo in nodos_a_mostrar_bc_disp_v31.iterrows(): 
             if not nodo['Prerrequisito'] or pd.isna(nodo['Prerrequisito']):
-                nodos_por_tier_bc_disp_v30[0].append(nodo); processed_nodes_bc_disp_v30.add(nodo['ID_Nodo'])
-        current_tier_bc_disp_v30 = 0 
-        while len(processed_nodes_bc_disp_v30) < len(nodos_a_mostrar_bc_disp_v30) and current_tier_bc_disp_v30 < len(nodos_a_mostrar_bc_disp_v30) :
-            newly_added_bc_disp_v30 = 0; next_tier_candidates_bc_disp_v30 = []
-            for _, nodo in nodos_a_mostrar_bc_disp_v30.iterrows():
-                if nodo['ID_Nodo'] in processed_nodes_bc_disp_v30: continue
-                prereqs_list_disp_v30 = [pr_id.strip() for pr_id in nodo['Prerrequisito'].split(',') if pr_id.strip()]
-                if prereqs_list_disp_v30 and all(pr_id in processed_nodes_bc_disp_v30 for pr_id in prereqs_list_disp_v30): 
-                    next_tier_candidates_bc_disp_v30.append(nodo); newly_added_bc_disp_v30 +=1
-            if not next_tier_candidates_bc_disp_v30 and newly_added_bc_disp_v30 == 0: 
-                for _, nodo_restante in nodos_a_mostrar_bc_disp_v30.iterrows():
-                    if nodo_restante['ID_Nodo'] not in processed_nodes_bc_disp_v30:
-                        nodos_por_tier_bc_disp_v30[current_tier_bc_disp_v30 + 100].append(nodo_restante); processed_nodes_bc_disp_v30.add(nodo_restante['ID_Nodo'])
+                nodos_por_tier_bc_disp_v31[0].append(nodo); processed_nodes_bc_disp_v31.add(nodo['ID_Nodo'])
+        current_tier_bc_disp_v31 = 0 
+        while len(processed_nodes_bc_disp_v31) < len(nodos_a_mostrar_bc_disp_v31) and current_tier_bc_disp_v31 < len(nodos_a_mostrar_bc_disp_v31) :
+            newly_added_bc_disp_v31 = 0; next_tier_candidates_bc_disp_v31 = []
+            for _, nodo in nodos_a_mostrar_bc_disp_v31.iterrows():
+                if nodo['ID_Nodo'] in processed_nodes_bc_disp_v31: continue
+                prereqs_list_disp_v31 = [pr_id.strip() for pr_id in nodo['Prerrequisito'].split(',') if pr_id.strip()]
+                if prereqs_list_disp_v31 and all(pr_id in processed_nodes_bc_disp_v31 for pr_id in prereqs_list_disp_v31): 
+                    next_tier_candidates_bc_disp_v31.append(nodo); newly_added_bc_disp_v31 +=1
+            if not next_tier_candidates_bc_disp_v31 and newly_added_bc_disp_v31 == 0: 
+                for _, nodo_restante in nodos_a_mostrar_bc_disp_v31.iterrows():
+                    if nodo_restante['ID_Nodo'] not in processed_nodes_bc_disp_v31:
+                        nodos_por_tier_bc_disp_v31[current_tier_bc_disp_v31 + 100].append(nodo_restante); processed_nodes_bc_disp_v31.add(nodo_restante['ID_Nodo'])
                 break
-            if newly_added_bc_disp_v30 > 0 :
-                current_tier_bc_disp_v30 += 1
-                for nodo in next_tier_candidates_bc_disp_v30:
-                    if nodo['ID_Nodo'] not in processed_nodes_bc_disp_v30: 
-                        nodos_por_tier_bc_disp_v30[current_tier_bc_disp_v30].append(nodo); processed_nodes_bc_disp_v30.add(nodo['ID_Nodo'])
+            if newly_added_bc_disp_v31 > 0 :
+                current_tier_bc_disp_v31 += 1
+                for nodo in next_tier_candidates_bc_disp_v31:
+                    if nodo['ID_Nodo'] not in processed_nodes_bc_disp_v31: 
+                        nodos_por_tier_bc_disp_v31[current_tier_bc_disp_v31].append(nodo); processed_nodes_bc_disp_v31.add(nodo['ID_Nodo'])
             else: 
-                for _, nodo_restante in nodos_a_mostrar_bc_disp_v30.iterrows():
-                    if nodo_restante['ID_Nodo'] not in processed_nodes_bc_disp_v30:
-                        nodos_por_tier_bc_disp_v30[current_tier_bc_disp_v30 + 100].append(nodo_restante); processed_nodes_bc_disp_v30.add(nodo_restante['ID_Nodo'])
+                for _, nodo_restante in nodos_a_mostrar_bc_disp_v31.iterrows():
+                    if nodo_restante['ID_Nodo'] not in processed_nodes_bc_disp_v31:
+                        nodos_por_tier_bc_disp_v31[current_tier_bc_disp_v31 + 100].append(nodo_restante); processed_nodes_bc_disp_v31.add(nodo_restante['ID_Nodo'])
                 break
-        for tier_level_val_disp_v30 in sorted(nodos_por_tier_bc_disp_v30.keys()): 
-            if nodos_por_tier_bc_disp_v30[tier_level_val_disp_v30]:
-                st.markdown(f"--- *Nivel/Grupo {tier_level_val_disp_v30 if tier_level_val_disp_v30 < 100 else 'Otros/Restantes'}* ---")
-                num_cols_display_bc_val_v30 = 3; node_cards_cols_bc_val_v30 = st.columns(num_cols_display_bc_val_v30); col_idx_bc_val_v30 = 0 
-                for nodo_item_bc_val_v30 in nodos_por_tier_bc_disp_v30[tier_level_val_disp_v30]: 
-                    with node_cards_cols_bc_val_v30[col_idx_bc_val_v30 % num_cols_display_bc_val_v30]:
-                        node_id_bc_val_v30 = nodo_item_bc_val_v30['ID_Nodo']; is_unlocked_bc_val_v30 = node_id_bc_val_v30 in st.session_state.bc_unlocked_nodes 
-                        can_be_unlocked_bc_val_v30 = check_prerequisites(node_id_bc_val_v30, df_skill_trees_global, st.session_state.bc_unlocked_nodes)
-                        beneficios_str_list_bc_val_v30 = [] 
-                        cols_para_beneficios_bc_val_v30 = stat_cols_order + ['PIERNA_MALA', 'FILIGRANAS'] 
-                        for col_stat_bc_val_v30 in cols_para_beneficios_bc_val_v30: 
-                            if col_stat_bc_val_v30 in nodo_item_bc_val_v30.index and pd.notna(nodo_item_bc_val_v30[col_stat_bc_val_v30]) and nodo_item_bc_val_v30[col_stat_bc_val_v30] > 0:
-                                if col_stat_bc_val_v30 == 'PIERNA_MALA': beneficios_str_list_bc_val_v30.append(f"+{int(nodo_item_bc_val_v30[col_stat_bc_val_v30])}⭐ WF")
-                                elif col_stat_bc_val_v30 == 'FILIGRANAS': beneficios_str_list_bc_val_v30.append(f"+{int(nodo_item_bc_val_v30[col_stat_bc_val_v30])}⭐ SM")
-                                else: beneficios_str_list_bc_val_v30.append(f"+{int(nodo_item_bc_val_v30[col_stat_bc_val_v30])} {col_stat_bc_val_v30}")
-                        if 'PlayStyle' in nodo_item_bc_val_v30.index and pd.notna(nodo_item_bc_val_v30['PlayStyle']) and nodo_item_bc_val_v30['PlayStyle'] != '':
-                            beneficios_str_list_bc_val_v30.append(f"PlayStyle: {nodo_item_bc_val_v30['PlayStyle']}")
-                        beneficios_str_bc_val_v30 = ", ".join(beneficios_str_list_bc_val_v30) if beneficios_str_list_bc_val_v30 else "Sin bonus directo" 
+        for tier_level_val_disp_v31 in sorted(nodos_por_tier_bc_disp_v31.keys()): 
+            if nodos_por_tier_bc_disp_v31[tier_level_val_disp_v31]:
+                st.markdown(f"--- *Nivel/Grupo {tier_level_val_disp_v31 if tier_level_val_disp_v31 < 100 else 'Otros/Restantes'}* ---")
+                num_cols_display_bc_val_v31 = 3; node_cards_cols_bc_val_v31 = st.columns(num_cols_display_bc_val_v31); col_idx_bc_val_v31 = 0 
+                for nodo_item_bc_val_v31 in nodos_por_tier_bc_disp_v31[tier_level_val_disp_v31]: 
+                    with node_cards_cols_bc_val_v31[col_idx_bc_val_v31 % num_cols_display_bc_val_v31]:
+                        node_id_bc_val_v31 = nodo_item_bc_val_v31['ID_Nodo']; is_unlocked_bc_val_v31 = node_id_bc_val_v31 in st.session_state.bc_unlocked_nodes 
+                        can_be_unlocked_bc_val_v31 = check_prerequisites(node_id_bc_val_v31, df_skill_trees_global, st.session_state.bc_unlocked_nodes)
+                        beneficios_str_list_bc_val_v31 = [] 
+                        cols_para_beneficios_bc_val_v31 = stat_cols_order + ['PIERNA_MALA', 'FILIGRANAS'] 
+                        for col_stat_bc_val_v31 in cols_para_beneficios_bc_val_v31: 
+                            if col_stat_bc_val_v31 in nodo_item_bc_val_v31.index and pd.notna(nodo_item_bc_val_v31[col_stat_bc_val_v31]) and nodo_item_bc_val_v31[col_stat_bc_val_v31] > 0:
+                                if col_stat_bc_val_v31 == 'PIERNA_MALA': beneficios_str_list_bc_val_v31.append(f"+{int(nodo_item_bc_val_v31[col_stat_bc_val_v31])}⭐ WF")
+                                elif col_stat_bc_val_v31 == 'FILIGRANAS': beneficios_str_list_bc_val_v31.append(f"+{int(nodo_item_bc_val_v31[col_stat_bc_val_v31])}⭐ SM")
+                                else: beneficios_str_list_bc_val_v31.append(f"+{int(nodo_item_bc_val_v31[col_stat_bc_val_v31])} {col_stat_bc_val_v31}")
+                        if 'PlayStyle' in nodo_item_bc_val_v31.index and pd.notna(nodo_item_bc_val_v31['PlayStyle']) and nodo_item_bc_val_v31['PlayStyle'] != '':
+                            beneficios_str_list_bc_val_v31.append(f"PlayStyle: {nodo_item_bc_val_v31['PlayStyle']}")
+                        beneficios_str_bc_val_v31 = ", ".join(beneficios_str_list_bc_val_v31) if beneficios_str_list_bc_val_v31 else "Sin bonus directo" 
                         with st.container(border=True):
-                            st.markdown(f"**{nodo_item_bc_val_v30['Nombre_Visible']}**")
-                            st.caption(f"ID: {node_id_bc_val_v30} | Costo: {nodo_item_bc_val_v30['Costo']}")
-                            st.caption(f"Beneficios: {beneficios_str_bc_val_v30}")
-                            if is_unlocked_bc_val_v30: st.button("✅ Desbloq.", key=f"skill_node_{node_id_bc_val_v30}_v30d", disabled=True)
-                            elif can_be_unlocked_bc_val_v30 and st.session_state.bc_points_remaining >= nodo_item_bc_val_v30['Costo']:
-                                if st.button("🔓 Desbloq.", key=f"skill_node_{node_id_bc_val_v30}_v30u"):
-                                    st.session_state.bc_unlocked_nodes.add(node_id_bc_val_v30)
-                                    st.session_state.bc_points_remaining -= nodo_item_bc_val_v30['Costo']
+                            st.markdown(f"**{nodo_item_bc_val_v31['Nombre_Visible']}**")
+                            st.caption(f"ID: {node_id_bc_val_v31} | Costo: {nodo_item_bc_val_v31['Costo']}")
+                            st.caption(f"Beneficios: {beneficios_str_bc_val_v31}")
+                            if is_unlocked_bc_val_v31: st.button("✅ Desbloq.", key=f"skill_node_{node_id_bc_val_v31}_v31d", disabled=True)
+                            elif can_be_unlocked_bc_val_v31 and st.session_state.bc_points_remaining >= nodo_item_bc_val_v31['Costo']:
+                                if st.button("🔓 Desbloq.", key=f"skill_node_{node_id_bc_val_v31}_v31u"):
+                                    st.session_state.bc_unlocked_nodes.add(node_id_bc_val_v31)
+                                    st.session_state.bc_points_remaining -= nodo_item_bc_val_v31['Costo']
                                     st.rerun()
                             else:
-                                help_t_bc_val_v30 = "Prerreq." if not can_be_unlocked_bc_val_v30 else f"Puntos ({nodo_item_bc_val_v30['Costo']})"
-                                st.button("🔒 Bloq.", key=f"skill_node_{node_id_bc_val_v30}_v30l", disabled=True, help=help_t_bc_val_v30)
-                    col_idx_bc_val_v30 +=1
+                                help_t_bc_val_v31 = "Prerreq." if not can_be_unlocked_bc_val_v31 else f"Puntos ({nodo_item_bc_val_v31['Costo']})"
+                                st.button("🔒 Bloq.", key=f"skill_node_{node_id_bc_val_v31}_v31l", disabled=True, help=help_t_bc_val_v31)
+                    col_idx_bc_val_v31 +=1
     else: st.info("Selecciona un árbol de habilidad para ver sus nodos.")
 
 
 with tab_best_combo:
     # ... (igual que v2.8, con botón "Enviar a Build Craft" y usando stat_cols_order, y actualizando keys) ...
+    # ... (Asegurar que las keys de los widgets sean únicas, ej. _v31_opt) ...
     st.header("Búsqueda de Mejor Combinación por Atributos (Priorizados) - Stats Base")
     if not all_stats_df_base.empty:
-        queryable_stats_ordered_bc_opt_disp_v30 = [col for col in stat_cols_order if col in all_stats_df_base.columns and col not in ['Posicion', 'Altura', 'Peso', 'AcceleRATE']]
-        col1_bc_opt_disp_v30, col2_bc_opt_disp_v30, col3_bc_opt_disp_v30 = st.columns(3)
-        with col1_bc_opt_disp_v30: attr_pri_opt_val_v30 = st.selectbox("1er Atributo:", options=queryable_stats_ordered_bc_opt_disp_v30, key="attr_pri_v30_opt")
-        with col2_bc_opt_disp_v30: attr_sec_opt_val_v30 = st.selectbox("2do Atributo:", options=["(Ninguno)"] + queryable_stats_ordered_bc_opt_disp_v30, key="attr_sec_v30_opt")
-        with col3_bc_opt_disp_v30: attr_ter_opt_val_v30 = st.selectbox("3er Atributo:", options=["(Ninguno)"] + queryable_stats_ordered_bc_opt_disp_v30, key="attr_ter_v30_opt")
-        if st.button("Buscar Mejor Combinación Priorizada", key="btn_multi_attr_find_v30_opt"):
-            temp_df_opt_res_v30 = all_stats_df_base.copy(); sort_by_attrs_opt_list_v30 = [attr_pri_opt_val_v30]
-            if attr_sec_opt_val_v30 != "(Ninguno)": sort_by_attrs_opt_list_v30.append(attr_sec_opt_val_v30)
-            if attr_ter_opt_val_v30 != "(Ninguno)": sort_by_attrs_opt_list_v30.append(attr_ter_opt_val_v30)
-            temp_df_opt_res_v30 = temp_df_opt_res_v30.sort_values(by=sort_by_attrs_opt_list_v30, ascending=[False]*len(sort_by_attrs_opt_list_v30))
-            if not temp_df_opt_res_v30.empty:
-                best_player_opt_res_v30 = temp_df_opt_res_v30.iloc[0]
-                st.subheader(f"Mejor Jugador (Stats Base): {best_player_opt_res_v30['Posicion']} | {best_player_opt_res_v30['Altura']}cm | {best_player_opt_res_v30['Peso']}kg")
-                if st.button(f"🛠️ Personalizar Habilidades para este Mejor Build", key=f"send_to_bc_best_opt_v30"):
-                    st.session_state.bc_pos, st.session_state.bc_alt, st.session_state.bc_pes = best_player_opt_res_v30['Posicion'], best_player_opt_res_v30['Altura'], best_player_opt_res_v30['Peso']
+        queryable_stats_ordered_bc_opt_disp_v31 = [col for col in stat_cols_order if col in all_stats_df_base.columns and col not in ['Posicion', 'Altura', 'Peso', 'AcceleRATE']]
+        col1_bc_opt_disp_v31, col2_bc_opt_disp_v31, col3_bc_opt_disp_v31 = st.columns(3)
+        with col1_bc_opt_disp_v31: attr_pri_opt_val_v31 = st.selectbox("1er Atributo:", options=queryable_stats_ordered_bc_opt_disp_v31, key="attr_pri_v31_opt")
+        with col2_bc_opt_disp_v31: attr_sec_opt_val_v31 = st.selectbox("2do Atributo:", options=["(Ninguno)"] + queryable_stats_ordered_bc_opt_disp_v31, key="attr_sec_v31_opt")
+        with col3_bc_opt_disp_v31: attr_ter_opt_val_v31 = st.selectbox("3er Atributo:", options=["(Ninguno)"] + queryable_stats_ordered_bc_opt_disp_v31, key="attr_ter_v31_opt")
+        if st.button("Buscar Mejor Combinación Priorizada", key="btn_multi_attr_find_v31_opt"):
+            temp_df_opt_res_v31 = all_stats_df_base.copy(); sort_by_attrs_opt_list_v31 = [attr_pri_opt_val_v31]
+            if attr_sec_opt_val_v31 != "(Ninguno)": sort_by_attrs_opt_list_v31.append(attr_sec_opt_val_v31)
+            if attr_ter_opt_val_v31 != "(Ninguno)": sort_by_attrs_opt_list_v31.append(attr_ter_opt_val_v31)
+            temp_df_opt_res_v31 = temp_df_opt_res_v31.sort_values(by=sort_by_attrs_opt_list_v31, ascending=[False]*len(sort_by_attrs_opt_list_v31))
+            if not temp_df_opt_res_v31.empty:
+                best_player_opt_res_v31 = temp_df_opt_res_v31.iloc[0]
+                st.subheader(f"Mejor Jugador (Stats Base): {best_player_opt_res_v31['Posicion']} | {best_player_opt_res_v31['Altura']}cm | {best_player_opt_res_v31['Peso']}kg")
+                if st.button(f"🛠️ Personalizar Habilidades para este Mejor Build", key=f"send_to_bc_best_opt_v31"):
+                    st.session_state.bc_pos, st.session_state.bc_alt, st.session_state.bc_pes = best_player_opt_res_v31['Posicion'], best_player_opt_res_v31['Altura'], best_player_opt_res_v31['Peso']
                     st.session_state.bc_unlocked_nodes, st.session_state.bc_points_remaining = set(), TOTAL_SKILL_POINTS
                     st.success(f"Perfil de Mejor Build enviado. Ajusta selectores en sidebar y ve a '🛠️ Build Craft'.")
-                accele_rate_best_opt_res_v30 = determinar_estilo_carrera(best_player_opt_res_v30['Altura'],best_player_opt_res_v30.get('AGI',0),best_player_opt_res_v30.get('STR',0),best_player_opt_res_v30.get('Acc',0))
-                styled_metric("Estilo de Carrera (AcceleRATE Base)", accele_rate_best_opt_res_v30); st.divider()
-                key_metrics_display_dict_v30 = {}
-                if attr_pri_opt_val_v30 in best_player_opt_res_v30: key_metrics_display_dict_v30[attr_pri_opt_val_v30] = best_player_opt_res_v30[attr_pri_opt_val_v30]
-                if attr_sec_opt_val_v30 != "(Ninguno)" and attr_sec_opt_val_v30 in best_player_opt_res_v30: key_metrics_display_dict_v30[attr_sec_opt_val_v30] = best_player_opt_res_v30[attr_sec_opt_val_v30]
-                if attr_ter_opt_val_v30 != "(Ninguno)" and attr_ter_opt_val_v30 in best_player_opt_res_v30: key_metrics_display_dict_v30[attr_ter_opt_val_v30] = best_player_opt_res_v30[attr_ter_opt_val_v30]
-                if 'IGS' in best_player_opt_res_v30: key_metrics_display_dict_v30['IGS'] = best_player_opt_res_v30['IGS']
-                num_metrics_cols_disp_v30_val = min(len(key_metrics_display_dict_v30), 3)
-                cols_metrics_cards_disp_v30_val = st.columns(num_metrics_cols_disp_v30_val) if num_metrics_cols_disp_v30_val > 0 else [st]
-                for i, (label, value) in enumerate(key_metrics_display_dict_v30.items()):
-                    with cols_metrics_cards_disp_v30_val[i % num_metrics_cols_disp_v30_val]: styled_metric(label, value)
+                accele_rate_best_opt_res_v31 = determinar_estilo_carrera(best_player_opt_res_v31['Altura'],best_player_opt_res_v31.get('AGI',0),best_player_opt_res_v31.get('STR',0),best_player_opt_res_v31.get('Acc',0))
+                styled_metric("Estilo de Carrera (AcceleRATE Base)", accele_rate_best_opt_res_v31); st.divider()
+                key_metrics_display_dict_v31 = {}
+                if attr_pri_opt_val_v31 in best_player_opt_res_v31: key_metrics_display_dict_v31[attr_pri_opt_val_v31] = best_player_opt_res_v31[attr_pri_opt_val_v31]
+                if attr_sec_opt_val_v31 != "(Ninguno)" and attr_sec_opt_val_v31 in best_player_opt_res_v31: key_metrics_display_dict_v31[attr_sec_opt_val_v31] = best_player_opt_res_v31[attr_sec_opt_val_v31]
+                if attr_ter_opt_val_v31 != "(Ninguno)" and attr_ter_opt_val_v31 in best_player_opt_res_v31: key_metrics_display_dict_v31[attr_ter_opt_val_v31] = best_player_opt_res_v31[attr_ter_opt_val_v31]
+                if 'IGS' in best_player_opt_res_v31: key_metrics_display_dict_v31['IGS'] = best_player_opt_res_v31['IGS']
+                num_metrics_cols_disp_v31 = min(len(key_metrics_display_dict_v31), 3)
+                cols_metrics_cards_disp_v31 = st.columns(num_metrics_cols_disp_v31) if num_metrics_cols_disp_v31 > 0 else [st]
+                for i, (label, value) in enumerate(key_metrics_display_dict_v31.items()):
+                    with cols_metrics_cards_disp_v31[i % num_metrics_cols_disp_v31]: styled_metric(label, value)
                 with st.expander("Ver todos los atributos base del mejor jugador"):
-                    st.json(best_player_opt_res_v30.drop(['Posicion', 'Altura', 'Peso'], errors='ignore').to_dict())
+                    st.json(best_player_opt_res_v31.drop(['Posicion', 'Altura', 'Peso'], errors='ignore').to_dict())
             else: st.info("No se encontraron combinaciones.")
     else: st.warning("Datos para las búsquedas no disponibles.")
 
@@ -535,51 +572,51 @@ with tab_filters:
     # ... (igual que v2.8, usando stat_cols_order para options, y actualizando keys) ...
     st.header("Filtros Múltiples Avanzados (Stats Base)")
     if not all_stats_df_base.empty:
-        queryable_stats_filter_ordered_tf_disp_v30 = [col for col in stat_cols_order if col in all_stats_df_base.columns and col not in ['Posicion', 'Altura', 'Peso', 'AcceleRATE', 'IGS']]
-        def add_filter_cb_v30():
+        queryable_stats_filter_ordered_tf_disp_v31 = [col for col in stat_cols_order if col in all_stats_df_base.columns and col not in ['Posicion', 'Altura', 'Peso', 'AcceleRATE', 'IGS']]
+        def add_filter_cb_v31():
             fid = st.session_state.next_filter_id
-            st.session_state.filters.append({'id': fid, 'attribute': queryable_stats_filter_ordered_tf_disp_v30[0], 'condition': '>=', 'value': 70})
+            st.session_state.filters.append({'id': fid, 'attribute': queryable_stats_filter_ordered_tf_disp_v31[0], 'condition': '>=', 'value': 70})
             st.session_state.next_filter_id += 1
-        def remove_filter_cb_v30(fid_to_remove):
+        def remove_filter_cb_v31(fid_to_remove):
             st.session_state.filters = [f for f in st.session_state.filters if f['id'] != fid_to_remove]
-        st.button("➕ Añadir Criterio", on_click=add_filter_cb_v30, key="add_filter_btn_v30_tab")
-        filter_cont_disp_v30 = st.container()
-        with filter_cont_disp_v30: 
+        st.button("➕ Añadir Criterio", on_click=add_filter_cb_v31, key="add_filter_btn_v31_tab")
+        filter_cont_disp_v31 = st.container()
+        with filter_cont_disp_v31: 
             for item in st.session_state.filters:
-                fid = item['id']; cols_f_disp_v30_val = st.columns([5,3,2,1]) # Renombrar
-                try: current_attr_idx_f_v30_val = queryable_stats_filter_ordered_tf_disp_v30.index(item['attribute']) # Renombrar
-                except ValueError: current_attr_idx_f_v30_val = 0 
-                item['attribute'] = cols_f_disp_v30_val[0].selectbox("Atributo:", options=queryable_stats_filter_ordered_tf_disp_v30, index=current_attr_idx_f_v30_val, key=f"f_attr_{fid}_v30")
-                cond_opts_f_v30_val = ['>=', '<=', '==', '>', '<'] # Renombrar
-                try: current_cond_idx_f_v30_val = cond_opts_f_v30_val.index(item['condition']) # Renombrar
-                except ValueError: current_cond_idx_f_v30_val = 0
-                item['condition'] = cols_f_disp_v30_val[1].selectbox("Condición:", options=cond_opts_f_v30_val, index=current_cond_idx_f_v30_val, key=f"f_cond_{fid}_v30")
-                item['value'] = cols_f_disp_v30_val[2].number_input("Valor:", value=int(item['value']), step=1, key=f"f_val_{fid}_v30")
-                if cols_f_disp_v30_val[3].button("➖", key=f"f_rem_{fid}_v30", help="Eliminar"): remove_filter_cb_v30(fid); st.rerun() 
+                fid = item['id']; cols_f_disp_v31 = st.columns([5,3,2,1])
+                try: current_attr_idx_f_v31 = queryable_stats_filter_ordered_tf_disp_v31.index(item['attribute'])
+                except ValueError: current_attr_idx_f_v31 = 0 
+                item['attribute'] = cols_f_disp_v31[0].selectbox("Atributo:", options=queryable_stats_filter_ordered_tf_disp_v31, index=current_attr_idx_f_v31, key=f"f_attr_{fid}_v31")
+                cond_opts_f_v31 = ['>=', '<=', '==', '>', '<']
+                try: current_cond_idx_f_v31 = cond_opts_f_v31.index(item['condition'])
+                except ValueError: current_cond_idx_f_v31 = 0
+                item['condition'] = cols_f_disp_v31[1].selectbox("Condición:", options=cond_opts_f_v31, index=current_cond_idx_f_v31, key=f"f_cond_{fid}_v31")
+                item['value'] = cols_f_disp_v31[2].number_input("Valor:", value=int(item['value']), step=1, key=f"f_val_{fid}_v31")
+                if cols_f_disp_v31[3].button("➖", key=f"f_rem_{fid}_v31", help="Eliminar"): remove_filter_cb_v31(fid); st.rerun() 
         
-        if st.button("Aplicar Filtros (Stats Base)", key="btn_apply_adv_f_v30_tab"): 
+        if st.button("Aplicar Filtros (Stats Base)", key="btn_apply_adv_f_v31_tab"): 
             if not st.session_state.filters: st.info("No hay criterios definidos.")
             else:
                 # ... (lógica de aplicación de filtros igual que v2.8) ...
-                df_to_filter_res_v30_f_val = all_stats_df_base.copy()
-                if 'AcceleRATE' not in df_to_filter_res_v30_f_val.columns:
-                    df_to_filter_res_v30_f_val['AcceleRATE'] = df_to_filter_res_v30_f_val.apply(lambda r: determinar_estilo_carrera(r['Altura'], r.get('AGI',0),r.get('STR',0),r.get('Acc',0)), axis=1)
-                df_adv_f_res_v30_f_val = df_to_filter_res_v30_f_val; valid_q_res_v30_f_val = True; act_f_attrs_list_v30_f_val = []
-                for f_app_item_v30_f_val in st.session_state.filters:
-                    attr_f_val_f_val, cond_f_val_f_val, val_f_val_f_val = f_app_item_v30_f_val['attribute'], f_app_item_v30_f_val['condition'], f_app_item_v30_f_val['value']
-                    act_f_attrs_list_v30_f_val.append(attr_f_val_f_val)
-                    if attr_f_val_f_val not in df_adv_f_res_v30_f_val.columns: st.error(f"Atributo '{attr_f_val_f_val}' no encontrado."); valid_q_res_v30_f_val = False; break
-                    if cond_f_val_f_val == '>=': df_adv_f_res_v30_f_val = df_adv_f_res_v30_f_val[df_adv_f_res_v30_f_val[attr_f_val_f_val] >= val_f_val_f_val]
-                    elif cond_f_val_f_val == '<=': df_adv_f_res_v30_f_val = df_adv_f_res_v30_f_val[df_adv_f_res_v30_f_val[attr_f_val_f_val] <= val_f_val_f_val]
-                    elif cond_f_val_f_val == '==': df_adv_f_res_v30_f_val = df_adv_f_res_v30_f_val[df_adv_f_res_v30_f_val[attr_f_val_f_val] == val_f_val_f_val]
-                    elif cond_f_val_f_val == '>': df_adv_f_res_v30_f_val = df_adv_f_res_v30_f_val[df_adv_f_res_v30_f_val[attr_f_val_f_val] > val_f_val_f_val]
-                    elif cond_f_val_f_val == '<': df_adv_f_res_v30_f_val = df_adv_f_res_v30_f_val[df_adv_f_res_v30_f_val[attr_f_val_f_val] < val_f_val_f_val]
-                if valid_q_res_v30_f_val:
-                    if not df_adv_f_res_v30_f_val.empty:
-                        st.write(f"Combinaciones ({len(df_adv_f_res_v30_f_val)}):")
-                        cols_disp_res_list_f_val = ['Posicion', 'Altura', 'Peso'] + [col for col in queryable_stats_filter_ordered_tf_disp_v30 if col in act_f_attrs_list_v30_f_val] + ['AcceleRATE', 'IGS']
-                        final_cols_disp_list_val_f_val = []; [final_cols_disp_list_val_f_val.append(col) for col in cols_disp_res_list_f_val if col not in final_cols_disp_list_val_f_val]
-                        final_cols_disp_existing_list_val_f_val = [col for col in final_cols_disp_list_val_f_val if col in df_adv_f_res_v30_f_val.columns]
-                        st.dataframe(df_adv_f_res_v30_f_val[final_cols_disp_existing_list_val_f_val])
+                df_to_filter_res_v31 = all_stats_df_base.copy()
+                if 'AcceleRATE' not in df_to_filter_res_v31.columns:
+                    df_to_filter_res_v31['AcceleRATE'] = df_to_filter_res_v31.apply(lambda r: determinar_estilo_carrera(r['Altura'], r.get('AGI',0),r.get('STR',0),r.get('Acc',0)), axis=1)
+                df_adv_f_res_v31 = df_to_filter_res_v31; valid_q_res_v31 = True; act_f_attrs_list_v31 = []
+                for f_app_item_v31 in st.session_state.filters:
+                    attr_f_val_f_v31, cond_f_val_f_v31, val_f_val_f_v31 = f_app_item_v31['attribute'], f_app_item_v31['condition'], f_app_item_v31['value']
+                    act_f_attrs_list_v31.append(attr_f_val_f_v31)
+                    if attr_f_val_f_v31 not in df_adv_f_res_v31.columns: st.error(f"Atributo '{attr_f_val_f_v31}' no encontrado."); valid_q_res_v31 = False; break
+                    if cond_f_val_f_v31 == '>=': df_adv_f_res_v31 = df_adv_f_res_v31[df_adv_f_res_v31[attr_f_val_f_v31] >= val_f_val_f_v31]
+                    elif cond_f_val_f_v31 == '<=': df_adv_f_res_v31 = df_adv_f_res_v31[df_adv_f_res_v31[attr_f_val_f_v31] <= val_f_val_f_v31]
+                    elif cond_f_val_f_v31 == '==': df_adv_f_res_v31 = df_adv_f_res_v31[df_adv_f_res_v31[attr_f_val_f_v31] == val_f_val_f_v31]
+                    elif cond_f_val_f_v31 == '>': df_adv_f_res_v31 = df_adv_f_res_v31[df_adv_f_res_v31[attr_f_val_f_v31] > val_f_val_f_v31]
+                    elif cond_f_val_f_v31 == '<': df_adv_f_res_v31 = df_adv_f_res_v31[df_adv_f_res_v31[attr_f_val_f_v31] < val_f_val_f_v31]
+                if valid_q_res_v31:
+                    if not df_adv_f_res_v31.empty:
+                        st.write(f"Combinaciones ({len(df_adv_f_res_v31)}):")
+                        cols_disp_res_list_f_v31 = ['Posicion', 'Altura', 'Peso'] + [col for col in queryable_stats_filter_ordered_tf_disp_v31 if col in act_f_attrs_list_v31] + ['AcceleRATE', 'IGS']
+                        final_cols_disp_list_val_f_v31 = []; [final_cols_disp_list_val_f_v31.append(col) for col in cols_disp_res_list_f_v31 if col not in final_cols_disp_list_val_f_v31]
+                        final_cols_disp_existing_list_val_f_v31 = [col for col in final_cols_disp_list_val_f_v31 if col in df_adv_f_res_v31.columns]
+                        st.dataframe(df_adv_f_res_v31[final_cols_disp_existing_list_val_f_v31])
                     else: st.info("Ninguna combinación cumple criterios.")
     else: st.warning("Datos para filtros no disponibles.")
