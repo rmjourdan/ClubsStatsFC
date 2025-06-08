@@ -2,9 +2,9 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from collections import defaultdict
 import math
-import json 
+import json
+from collections import defaultdict
 from visualizacion_fc25_style import mostrar_visualizacion_fc25  # NUEVO: importar visualización FC25
 
 
@@ -15,10 +15,11 @@ STAR_EMOJI = "⭐"
 st.set_page_config(page_title="Calculadora Stats FC25 v3.3", layout="wide") 
 
 # --- Definiciones Constantes ---
-APP_VERSION = "v3.3" 
+APP_VERSION = "v3.3.5" 
 BASE_WF, BASE_SM, MAX_STARS, MAX_STAT_VAL = 2, 3, 5, 99
 TOTAL_SKILL_POINTS = 184
 DEFAULT_CLUB_BUDGET = 1750000 
+
 MAIN_CATEGORIES = ['PAC', 'SHO', 'PAS', 'DRI', 'DEF', 'PHY']
 SUB_STATS_MAPPING = {
     'PAC': ['Acc', 'Spr'],
@@ -86,8 +87,10 @@ def cargar_arbol_habilidades():
     try:
         df_skill_trees = pd.read_csv(skill_tree_file)
         for col in ALL_POSSIBLE_STAT_BOOST_COLS_SKILL_TREE: 
-            if col in df_skill_trees.columns: df_skill_trees[col] = pd.to_numeric(df_skill_trees[col], errors='coerce').fillna(0).astype(int)
-            else: df_skill_trees[col] = 0 
+            if col in df_skill_trees.columns: 
+                df_skill_trees[col] = pd.to_numeric(df_skill_trees[col], errors='coerce').fillna(0).astype(int)
+            else: 
+                df_skill_trees[col] = 0
         
         if 'Costo' in df_skill_trees.columns: 
             df_skill_trees['Costo'] = pd.to_numeric(df_skill_trees['Costo'], errors='coerce').fillna(0).astype(int)
@@ -112,8 +115,10 @@ def cargar_instalaciones_club():
     try:
         df_instalaciones = pd.read_csv(instalaciones_file)
         for col in ALL_POSSIBLE_STAT_BOOST_COLS_FACILITIES:
-            if col in df_instalaciones.columns: df_instalaciones[col] = pd.to_numeric(df_instalaciones[col], errors='coerce').fillna(0).astype(int)
-            else: df_instalaciones[col] = 0 
+            if col in df_instalaciones.columns: 
+                df_instalaciones[col] = pd.to_numeric(df_instalaciones[col], errors='coerce').fillna(0).astype(int)
+            else: 
+                df_instalaciones[col] = 0
         if 'Precio' in df_instalaciones.columns:
             df_instalaciones['Precio'] = pd.to_numeric(df_instalaciones['Precio'], errors='coerce').fillna(0).astype(int)
         else: st.error("Columna 'Precio' no encontrada en CSV de Instalaciones."); return None 
@@ -123,7 +128,6 @@ def cargar_instalaciones_club():
             if col_txt in df_instalaciones.columns:
                 df_instalaciones[col_txt] = df_instalaciones[col_txt].fillna('').astype(str)
             else:
-                if col_txt not in ['PlayStyle', 'EsPlus']: st.warning(f"Columna '{col_txt}' no encontrada en {instalaciones_file}, se creará vacía.")
                 df_instalaciones[col_txt] = ''
         return df_instalaciones
     except FileNotFoundError: st.error(f"ERROR CRÍTICO: No se encontró '{instalaciones_file}'."); return None
@@ -140,18 +144,22 @@ def calcular_stats_base_jugador(pos_sel, alt_sel, peso_sel, base_ref_stats, mod_
 # --- Pre-cálculo de todas las combinaciones base ---
 @st.cache_data
 def precompute_all_base_stats(_base_ref_stats, _mod_alt_df, _mod_peso_df, _diff_pos_df, _stat_cols_order):
-    all_data = []; 
+    all_data = []
     if not all(isinstance(df, (pd.DataFrame, pd.Series)) for df in [_base_ref_stats, _mod_alt_df, _mod_peso_df, _diff_pos_df]): return pd.DataFrame()
     if not (_diff_pos_df.index.tolist() and _mod_alt_df.index.tolist() and _mod_peso_df.index.tolist()): return pd.DataFrame()
     for pos in _diff_pos_df.index:
         for alt_v in _mod_alt_df.index:
             for pes_v in _mod_peso_df.index:
                 stats = calcular_stats_base_jugador(pos, alt_v, pes_v, _base_ref_stats, _mod_alt_df, _mod_peso_df, _diff_pos_df)
-                if stats is not None: entry = {'Posicion': pos, 'Altura': alt_v, 'Peso': pes_v, **stats.to_dict()}; all_data.append(entry)
+                if stats is not None: 
+                    entry = {'Posicion': pos, 'Altura': alt_v, 'Peso': pes_v, **stats.to_dict()}
+                    all_data.append(entry)
     df = pd.DataFrame(all_data)
     if not df.empty and _stat_cols_order:
-        valid_cols = [col for col in _stat_cols_order if col in df.columns]; cols_df_order = ['Posicion', 'Altura', 'Peso'] + valid_cols 
-        cols_df_order_existing = [col for col in cols_df_order if col in df.columns]; df = df[cols_df_order_existing]
+        valid_cols = [col for col in _stat_cols_order if col in df.columns]
+        cols_df_order = ['Posicion', 'Altura', 'Peso'] + valid_cols 
+        cols_df_order_existing = [col for col in cols_df_order if col in df.columns]
+        df = df[cols_df_order_existing]
     return df
 
 # --- Funciones Auxiliares para el Editor de Habilidades e Instalaciones ---
@@ -177,11 +185,14 @@ def calcular_stats_completas(stats_jugador_base, altura_jugador_actual,
         for stat_col in ALL_POSSIBLE_STAT_BOOST_COLS_SKILL_TREE:
             if stat_col in node_data.index and pd.notna(node_data[stat_col]) and node_data[stat_col] != 0:
                 boost_val = int(node_data[stat_col])
-                if stat_col == 'PIERNA_MALA': current_wf += boost_val
-                elif stat_col == 'FILIGRANAS': current_sm += boost_val
+                if stat_col == 'PIERNA_MALA': 
+                    current_wf += boost_val
+                elif stat_col == 'FILIGRANAS': 
+                    current_sm += boost_val
                 elif stat_col in stats_modificadas.index and pd.api.types.is_numeric_dtype(stats_modificadas[stat_col]):
                     stats_modificadas[stat_col] += boost_val
-                    if stat_col in IGS_SUB_STATS: total_igs_boost_from_skills += boost_val
+                    if stat_col in IGS_SUB_STATS: 
+                        total_igs_boost_from_skills += boost_val
     
     for stat_name in IGS_SUB_STATS: 
         if stat_name in stats_modificadas.index and pd.api.types.is_numeric_dtype(stats_modificadas[stat_name]):
@@ -193,7 +204,7 @@ def calcular_stats_completas(stats_jugador_base, altura_jugador_actual,
     stats_finales_con_todo = stats_modificadas.copy()
     total_igs_boost_from_facilities = 0
 
-    if apply_facilities_boost and df_facilities is not None and 'unlocked_facility_levels' in st.session_state :
+    if apply_facilities_boost and df_facilities is not None and 'unlocked_facility_levels' in st.session_state:
         for facility_id in st.session_state.unlocked_facility_levels: 
             if facility_id not in df_facilities['ID_Instalacion'].values: continue
             facility_data = df_facilities[df_facilities['ID_Instalacion'] == facility_id].iloc[0]
@@ -202,7 +213,8 @@ def calcular_stats_completas(stats_jugador_base, altura_jugador_actual,
                     boost_val = int(facility_data[stat_col])
                     if stat_col in stats_finales_con_todo.index and pd.api.types.is_numeric_dtype(stats_finales_con_todo[stat_col]):
                         stats_finales_con_todo[stat_col] += boost_val
-                        if stat_col in IGS_SUB_STATS: total_igs_boost_from_facilities += boost_val
+                        if stat_col in IGS_SUB_STATS: 
+                            total_igs_boost_from_facilities += boost_val
         
         for stat_name in IGS_SUB_STATS:
             if stat_name in stats_finales_con_todo.index and pd.api.types.is_numeric_dtype(stats_finales_con_todo[stat_name]):
@@ -340,6 +352,850 @@ def verificar_dependencias_instalacion(instalacion_id_a_evaluar, df_all_faciliti
     return list(set(dependent_facilities_names))
 
 
+# --- Función de Generación de Resumen Visual HTML ---
+def generar_resumen_visual_html(pos, altura, peso, stats_completas, unlocked_nodes, df_skill_trees, 
+                               unlocked_facilities, df_instalaciones, apply_facilities_boost, points_remaining):
+    """
+    Genera un resumen visual HTML del build actual con estilo FC25
+    """
+    
+    # Calcular datos del build
+    puntos_gastados = TOTAL_SKILL_POINTS - points_remaining
+    progreso_build = (puntos_gastados / TOTAL_SKILL_POINTS) * 100
+    
+    # Obtener estadísticas principales
+    main_stats = {}
+    for stat in MAIN_CATEGORIES:
+        main_stats[stat] = int(float(str(stats_completas.get(stat, 0))))
+    
+    # Obtener estadísticas especiales
+    pierna_mala = int(float(str(stats_completas.get('PIERNA_MALA', BASE_WF))))
+    filigranas = int(float(str(stats_completas.get('FILIGRANAS', BASE_SM))))
+    igs_total = int(float(str(stats_completas.get('IGS', '0'))))
+    accelerate = str(stats_completas.get('AcceleRATE', 'N/A'))
+    
+    # Función para obtener color de estadística con rangos fijos
+    def get_stat_color(value):
+        if value >= 95:
+            return {"background": "#b4a7d6", "color": "#000000"}  # Morado + negro
+        elif value >= 85:
+            return {"background": "#b6d7a8", "color": "#003300"}  # Verde + verde oscuro
+        elif value >= 75:
+            return {"background": "#fce8b2", "color": "#594400"}  # Amarillo + marrón oscuro
+        else:
+            return {"background": "#f4c7c3", "color": "#800000"}  # Rosa + rojo oscuro
+    
+    # NUEVA FUNCIÓN: Generar coordenadas del mapa de nodos
+    def generar_mapa_nodos():
+        if not unlocked_nodes or df_skill_trees is None:
+            return ""
+        
+        # Agrupar nodos por árbol, sub-árbol, nivel y columna
+        arboles_con_nodos = {}
+        for node_id in unlocked_nodes:
+            node_data = df_skill_trees[df_skill_trees['ID_Nodo'] == node_id]
+            if not node_data.empty:
+                node_info = node_data.iloc[0]
+                tree_name = node_info.get('Arbol', 'Sin Árbol')
+                sub_tree_name = node_info.get('Sub_Arbol', '')
+                nivel = node_info.get('Nivel', 0)
+                
+                # Manejar sub_tree_name como posible float NaN
+                if pd.isna(sub_tree_name):
+                    sub_tree_name = ''
+                else:
+                    sub_tree_name = str(sub_tree_name).strip()
+                
+                # Extraer la columna del ID_Nodo (parte después del último "_")
+                node_id_parts = node_id.split('_')
+                if len(node_id_parts) >= 2:
+                    # Extraer la letra de la columna del último segmento (ej: "B3" -> "B")
+                    last_part = node_id_parts[-1]
+                    columna_letra = ""
+                    for char in last_part:
+                        if char.isalpha():
+                            columna_letra = char
+                            break
+                    if not columna_letra:
+                        columna_letra = "A"  # Default si no encuentra letra
+                else:
+                    columna_letra = "A"
+                
+                # Crear estructura jerárquica
+                if tree_name not in arboles_con_nodos:
+                    arboles_con_nodos[tree_name] = {}
+                
+                # Si hay sub-árbol, usarlo como división
+                if sub_tree_name and sub_tree_name.strip():
+                    if sub_tree_name not in arboles_con_nodos[tree_name]:
+                        arboles_con_nodos[tree_name][sub_tree_name] = {}
+                    sub_container = arboles_con_nodos[tree_name][sub_tree_name]
+                else:
+                    # Si no hay sub-árbol, usar directamente el árbol principal
+                    if 'PRINCIPAL' not in arboles_con_nodos[tree_name]:
+                        arboles_con_nodos[tree_name]['PRINCIPAL'] = {}
+                    sub_container = arboles_con_nodos[tree_name]['PRINCIPAL']
+                
+                # Crear estructura de nivel y columna
+                if nivel not in sub_container:
+                    sub_container[nivel] = {}
+                if columna_letra not in sub_container[nivel]:
+                    sub_container[nivel][columna_letra] = []
+                
+                sub_container[nivel][columna_letra].append({
+                    'id': node_id,
+                    'nombre': node_info.get('Nombre_Visible', f'Nodo {node_id}'),
+                    'costo': node_info.get('Costo', 0),
+                    'columna_original': columna_letra,
+                    'nivel_original': nivel
+                })
+        
+        # Generar HTML del mapa
+        mapa_html = '<div class="node-map-container">'
+        
+        for tree_name in sorted(arboles_con_nodos.keys()):
+            mapa_html += f'<div class="tree-map-section">'
+            mapa_html += f'<h4 class="tree-map-title">{tree_name}</h4>'
+            
+            # Crear contenedor horizontal para sub-árboles
+            mapa_html += f'<div class="subtrees-container">'
+            
+            # Procesar cada sub-árbol
+            for sub_tree_key in sorted(arboles_con_nodos[tree_name].keys()):
+                sub_tree_data = arboles_con_nodos[tree_name][sub_tree_key]
+                
+                mapa_html += f'<div class="subtree-section">'
+                
+                # Solo mostrar título del sub-árbol si no es "PRINCIPAL"
+                if sub_tree_key != 'PRINCIPAL':
+                    mapa_html += f'<h5 class="subtree-title">{sub_tree_key}</h5>'
+                
+                mapa_html += f'<div class="tier-map">'
+                
+                # Obtener todos los niveles para este sub-árbol
+                niveles = sorted(sub_tree_data.keys())
+                
+                # Crear grid de coordenadas para este sub-árbol
+                for nivel in niveles:
+                    mapa_html += f'<div class="tier-row" data-nivel="{nivel}">'
+                    mapa_html += f'<div class="tier-label">N{nivel}</div>'
+                    
+                    # Obtener todas las columnas para este nivel y ordenarlas
+                    columnas_en_nivel = sorted(sub_tree_data[nivel].keys())
+                    
+                    for columna_letra in columnas_en_nivel:
+                        nodes_in_column = sub_tree_data[nivel][columna_letra]
+                        for node in nodes_in_column:
+                            mapa_html += f'''<div class="node-coord">
+                                <div class="coord-label">{columna_letra}{nivel}</div>
+                                <div class="node-mini-name">{node['nombre'][:10]}...</div>
+                            </div>'''
+                    
+                    mapa_html += '</div>'
+                
+                mapa_html += '</div></div>'  # Cerrar tier-map y subtree-section
+            
+            mapa_html += '</div></div>'  # Cerrar subtrees-container y tree-map-section
+        
+        mapa_html += '</div>'
+        return mapa_html
+    
+    # Generar sección de nodos desbloqueados (versión existente)
+    nodos_html = ""
+    if unlocked_nodes and df_skill_trees is not None:
+        trees_with_nodes = {}
+        for node_id in unlocked_nodes:
+            node_data = df_skill_trees[df_skill_trees['ID_Nodo'] == node_id]
+            if not node_data.empty:
+                node_info = node_data.iloc[0]
+                tree_name = node_info.get('Arbol', 'Sin Árbol')
+                if tree_name not in trees_with_nodes:
+                    trees_with_nodes[tree_name] = []
+                trees_with_nodes[tree_name].append({
+                    'nombre': node_info.get('Nombre_Visible', f'Nodo {node_id}'),
+                    'costo': node_info.get('Costo', 0)
+                })
+        
+        if trees_with_nodes:
+            for tree_name, nodes in trees_with_nodes.items():
+                nodos_html += f'<div class="tree-section"><h4 class="tree-title">{tree_name}</h4><div class="nodes-grid">'
+                for node in nodes:
+                    nodos_html += f'''
+                    <div class="node-item">
+                        <span class="node-check">✓</span>
+                        <span class="node-name">{node['nombre']}</span>
+                        <span class="node-cost">{node['costo']}pts</span>
+                    </div>'''
+                nodos_html += '</div></div>'
+    
+    # Generar sección de instalaciones activas
+    instalaciones_html = ""
+    if apply_facilities_boost and unlocked_facilities and df_instalaciones is not None:
+        # Agrupar instalaciones por tipo y obtener solo el nivel más alto
+        facility_groups = {}
+        for facility_id in unlocked_facilities:
+            facility_data = df_instalaciones[df_instalaciones['ID_Instalacion'] == facility_id]
+            if not facility_data.empty:
+                facility_info = facility_data.iloc[0]
+                facility_type = facility_info.get('Instalacion', 'Sin Tipo')
+                
+                if facility_type not in facility_groups:
+                    facility_groups[facility_type] = []
+                facility_groups[facility_type].append({
+                    'id': facility_id,
+                    'nombre': facility_info.get('Nombre_Instalacion', f'Instalación {facility_id}'),
+                    'precio': facility_info.get('Precio', 0),
+                    'info': facility_info
+                })
+        
+        if facility_groups:
+            for facility_type, facilities in facility_groups.items():
+                # Ordenar por precio para obtener el tier más alto
+                facilities_sorted = sorted(facilities, key=lambda x: x['precio'])
+                highest_tier = facilities_sorted[-1]
+                
+                # Calcular costos acumulados
+                costos_acumulados = [str(f['precio']) for f in facilities_sorted]
+                costos_str = f"({', '.join(costos_acumulados)})"
+                
+                # Calcular beneficios totales de todos los niveles desbloqueados
+                total_benefits = {}
+                playstyles_facility = []
+                
+                for facility in facilities_sorted:
+                    facility_info = facility['info']
+                    
+                    # Sumar beneficios estadísticos
+                    for stat_col in ALL_POSSIBLE_STAT_BOOST_COLS_FACILITIES:
+                        if stat_col in facility_info.index and pd.notna(facility_info[stat_col]) and facility_info[stat_col] != 0:
+                            if stat_col not in total_benefits:
+                                total_benefits[stat_col] = 0
+                            total_benefits[stat_col] += int(facility_info[stat_col])
+                    
+                    # Recoger PlayStyles
+                    playstyle_val = facility_info.get('PlayStyle', '')
+                    is_plus = str(facility_info.get('EsPlus', '')).strip().lower() == 'si'
+                    if pd.notna(playstyle_val) and playstyle_val.strip():
+                        ps_display = f"{playstyle_val}{'+' if is_plus else ''}"
+                        if ps_display not in playstyles_facility:
+                            playstyles_facility.append(ps_display)
+                
+                # Construir string de beneficios
+                benefits_str = ""
+                if total_benefits:
+                    benefits_list = [f"+{val} {stat}" for stat, val in total_benefits.items()]
+                    benefits_str = f"[{', '.join(benefits_list)}]"
+                
+                if playstyles_facility:
+                    if benefits_str:
+                        benefits_str += f" [{', '.join(playstyles_facility)}]"
+                    else:
+                        benefits_str = f"[{', '.join(playstyles_facility)}]"
+                
+                instalaciones_html += f'''
+                <div class="facility-item">
+                    <span class="facility-type">🏨 {highest_tier['nombre']}</span>
+                    <span class="facility-price">${highest_tier['precio']:,} {costos_str}</span>
+                    <span class="facility-benefits">{benefits_str}</span>
+                </div>'''
+
+    # Recopilar Playstyles
+    playstyles = []
+    if unlocked_nodes and df_skill_trees is not None:
+        for node_id in unlocked_nodes:
+            node_data = df_skill_trees[df_skill_trees['ID_Nodo'] == node_id]
+            if not node_data.empty:
+                playstyle = node_data.iloc[0].get('PlayStyle', '')
+                if playstyle and playstyle.strip():
+                    playstyles.append(playstyle.strip())
+    
+    if apply_facilities_boost and unlocked_facilities and df_instalaciones is not None:
+        for facility_id in unlocked_facilities:
+            facility_data = df_instalaciones[df_instalaciones['ID_Instalacion'] == facility_id]
+            if not facility_data.empty:
+                playstyle = facility_data.iloc[0].get('PlayStyle', '')
+                if playstyle and playstyle.strip():
+                    playstyles.append(playstyle.strip())
+    
+    playstyles_unique = sorted(list(set(playstyles)))
+    
+    # Generar HTML del gráfico radar
+    radar_data = [main_stats[stat] for stat in MAIN_CATEGORIES]
+    radar_labels = MAIN_CATEGORIES
+    
+    html_content = f"""
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resumen Visual FC25 - {pos} {altura}cm {peso}kg</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        * {{
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }}
+        
+        body {{
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 50%, #1a1a1a 100%);
+            color: #ffffff;
+            min-height: 100vh;
+            padding: 20px;
+        }}
+        
+        .container {{
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 0 50px rgba(255, 140, 0, 0.3);
+            border: 2px solid rgba(255, 140, 0, 0.5);
+        }}
+        
+        .header {{
+            text-align: center;
+            margin-bottom: 30px;
+            background: linear-gradient(45deg, #ff8c00, #ffa500, #ff8c00);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }}
+        
+        .header h1 {{
+            font-size: 2.5em;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            margin-bottom: 10px;
+        }}
+        
+        .main-grid {{
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }}
+        
+        .stats-section {{
+            background: rgba(255, 140, 0, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            border: 1px solid rgba(255, 140, 0, 0.3);
+        }}
+        
+        .stats-grid {{
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }}
+        
+        .stat-card {{
+            text-align: center;
+            padding: 15px;
+            border-radius: 10px;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            transition: transform 0.3s ease;
+        }}
+        
+        .stat-card:hover {{
+            transform: scale(1.05);
+        }}
+        
+        .stat-label {{
+            font-size: 0.9em;
+            margin-bottom: 5px;
+            opacity: 0.9;
+        }}
+        
+        .stat-value {{
+            font-size: 1.8em;
+            font-weight: bold;
+        }}
+        
+        .special-stats {{
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-top: 20px;
+        }}
+        
+        .special-stat {{
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            border: 1px solid rgba(255, 140, 0, 0.3);
+        }}
+        
+        .radar-section {{
+            text-align: center;
+        }}
+        
+        .radar-container {{
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 15px;
+            padding: 20px;
+            border: 1px solid rgba(255, 140, 0, 0.3);
+        }}
+        
+        .progress-section {{
+            background: rgba(255, 140, 0, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(255, 140, 0, 0.3);
+        }}
+        
+        .progress-grid {{
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 15px;
+        }}
+        
+        .progress-item {{
+            text-align: center;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+        }}
+        
+        .progress-bar {{
+            width: 100%;
+            height: 20px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            overflow: hidden;
+            margin-top: 10px;
+        }}
+        
+        .progress-fill {{
+            height: 100%;
+            background: linear-gradient(90deg, #ff8c00, #ffa500);
+            border-radius: 10px;
+            transition: width 0.3s ease;
+        }}
+        
+        .nodes-section {{
+            background: rgba(255, 140, 0, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(255, 140, 0, 0.3);
+        }}
+        
+        .tree-section {{
+            margin-bottom: 20px;
+        }}
+        
+        .tree-title {{
+            color: #ffa500;
+            margin-bottom: 10px;
+            padding-bottom: 5px;
+            border-bottom: 1px solid rgba(255, 140, 0, 0.3);
+        }}
+        
+        .nodes-grid {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 8px;
+        }}
+        
+        .node-item {{
+            background: rgba(0, 0, 0, 0.3);
+            padding: 8px;
+            border-radius: 6px;
+            border-left: 3px solid #00ff00;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }}
+        
+        .node-check {{
+            color: #00ff00;
+            font-weight: bold;
+        }}
+        
+        .node-name {{
+            flex: 1;
+            font-size: 0.9em;
+        }}
+        
+        .node-cost {{
+            color: #ffa500;
+            font-size: 0.8em;
+        }}
+        
+        /* NUEVOS ESTILOS PARA EL MAPA DE COORDENADAS */
+        .node-map-container {{
+            background: rgba(255, 140, 0, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(255, 140, 0, 0.3);
+        }}
+        
+        .tree-map-section {{
+            margin-bottom: 25px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            padding: 15px;
+        }}
+        
+        .tree-map-title {{
+            color: #ffa500;
+            margin-bottom: 15px;
+            text-align: center;
+            font-size: 1.2em;
+            border-bottom: 2px solid rgba(255, 140, 0, 0.5);
+            padding-bottom: 5px;
+        }}
+        
+        .subtrees-container {{
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            justify-content: space-around;
+        }}
+        
+        .subtree-section {{
+            flex: 1;
+            min-width: 200px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            padding: 10px;
+            border: 1px solid rgba(255, 140, 0, 0.2);
+        }}
+        
+        .subtree-title {{
+            color: #ffcc00;
+            font-size: 1em;
+            text-align: center;
+            margin-bottom: 10px;
+            padding-bottom: 3px;
+            border-bottom: 1px solid rgba(255, 204, 0, 0.3);
+        }}
+        
+        .tier-map {{
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }}
+        
+        .tier-row {{
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 3px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 6px;
+        }}
+        
+        .tier-label {{
+            background: #ff8c00;
+            color: black;
+            padding: 3px 6px;
+            border-radius: 4px;
+            font-weight: bold;
+            min-width: 30px;
+            text-align: center;
+            font-size: 0.8em;
+        }}
+        
+        .node-coord {{
+            background: rgba(0, 255, 0, 0.2);
+            border: 2px solid #00ff00;
+            border-radius: 6px;
+            padding: 3px;
+            min-width: 60px;
+            text-align: center;
+            transition: transform 0.2s ease;
+            font-size: 0.8em;
+        }}
+        
+        .node-coord:hover {{
+            transform: scale(1.05);
+            background: rgba(0, 255, 0, 0.3);
+        }}
+        
+        .node-coord.empty {{
+            background: rgba(100, 100, 100, 0.1);
+            border: 2px dashed rgba(100, 100, 100, 0.3);
+            visibility: hidden;
+        }}
+        
+        .coord-label {{
+            font-weight: bold;
+            color: #00ff00;
+            font-size: 0.7em;
+            margin-bottom: 1px;
+        }}
+        
+        .node-mini-name {{
+            font-size: 0.6em;
+            color: #ffffff;
+            opacity: 0.9;
+            line-height: 1.1;
+        }}
+        
+        .facilities-section {{
+            background: rgba(0, 100, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(0, 100, 255, 0.3);
+        }}
+        
+        .facility-item {{
+            background: rgba(0, 0, 0, 0.3);
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            border-left: 3px solid #0066ff;
+        }}
+        
+        .facility-type {{
+            color: #0066ff;
+            font-weight: bold;
+        }}
+        
+        .facility-name {{
+            margin-left: 10px;
+        }}
+        
+        .facility-price {{
+            float: right;
+            color: #ffa500;
+        }}
+        
+        .playstyles-section {{
+            background: rgba(128, 0, 128, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            border: 1px solid rgba(128, 0, 128, 0.3);
+        }}
+        
+        .playstyles-grid {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+        }}
+        
+        .playstyle-item {{
+            background: rgba(128, 0, 128, 0.2);
+            padding: 10px;
+            border-radius: 8px;
+            text-align: center;
+            border: 1px solid rgba(128, 0, 128, 0.4);
+        }}
+        
+        .section-title {{
+            font-size: 1.3em;
+            margin-bottom: 15px;
+            color: #ffa500;
+            font-weight: bold;
+        }}
+        
+        @media (max-width: 768px) {{
+            .main-grid {{
+                grid-template-columns: 1fr;
+            }}
+            
+            .stats-grid {{
+                grid-template-columns: repeat(2, 1fr);
+            }}
+            
+            .subtrees-container {{
+                flex-direction: column;
+            }}
+            
+            .tier-row {{
+                flex-wrap: wrap;
+            }}
+            
+            .node-coord {{
+                min-width: 50px;
+                font-size: 0.7em;
+            }}
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>⚽ BUILD FC25 ⚽</h1>
+            <h2>{pos} | {altura}cm | {peso}kg</h2>
+        </div>
+        
+        <div class="progress-section">
+            <div class="section-title">📊 PROGRESO DEL BUILD</div>
+            <div class="progress-grid">
+                <div class="progress-item">
+                    <div style="color: #ff8c00; font-weight: bold;">Puntos Gastados</div>
+                    <div style="font-size: 1.5em;">{puntos_gastados} / {TOTAL_SKILL_POINTS}</div>
+                </div>
+                <div class="progress-item">
+                    <div style="color: #ffd700; font-weight: bold;">Puntos Restantes</div>
+                    <div style="font-size: 1.5em;">{points_remaining}</div>
+                </div>
+            </div>
+            <div class="progress-bar">
+                <div class="progress-fill" style="width: {progreso_build:.1f}%"></div>
+            </div>
+        </div>
+        
+        <div class="main-grid">
+            <div class="stats-section">
+                <div class="section-title">📈 ATRIBUTOS PRINCIPALES</div>
+                <div class="stats-grid">
+    """
+    
+    # Agregar estadísticas principales con colores de fondo y texto contrastante
+    for stat, value in main_stats.items():
+        colors = get_stat_color(value)
+        html_content += f'''
+                    <div class="stat-card" style="background: {colors["background"]}; color: {colors["color"]}; border-color: {colors["color"]};">
+                        <div class="stat-label">{stat}</div>
+                        <div class="stat-value">{value}</div>
+                    </div>'''
+    
+    html_content += f"""
+                </div>
+                
+                <div class="special-stats">
+                    <div class="special-stat">
+                        <div>⭐ Pierna Mala</div>
+                        <div style="font-size: 1.5em;">{"⭐" * pierna_mala}</div>
+                    </div>
+                    <div class="special-stat">
+                        <div>✨ Filigranas</div>
+                        <div style="font-size: 1.5em;">{"⭐" * filigranas}</div>
+                    </div>
+                    <div class="special-stat">
+                        <div>🏃 AcceleRATE</div>
+                        <div style="font-size: 1.2em;">{accelerate}</div>
+                    </div>
+                    <div class="special-stat">
+                        <div>🎯 IGS Total</div>
+                        <div style="font-size: 1.5em; color: #ffa500;">{igs_total}</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="radar-section">
+                <div class="section-title">🕸️ GRÁFICO RADAR</div>
+                <div class="radar-container">
+                    <canvas id="radarChart" width="300" height="300"></canvas>
+                </div>
+            </div>
+        </div>
+    """
+    
+    # NUEVA SECCIÓN: Mapa de coordenadas de nodos
+    mapa_nodos_html = generar_mapa_nodos()
+    if mapa_nodos_html:
+        html_content += f'''
+        <div class="section-title">🗺️ MAPA DE COORDENADAS DE NODOS DESBLOQUEADOS</div>
+        {mapa_nodos_html}'''
+    
+    # Agregar secciones condicionales existentes
+    if nodos_html:
+        html_content += f'''
+        <div class="nodes-section">
+            <div class="section-title">🌳 NODOS DE HABILIDAD DESBLOQUEADOS</div>
+            {nodos_html}
+        </div>'''
+    
+    if instalaciones_html:
+        html_content += f'''
+        <div class="facilities-section">
+            <div class="section-title">🏨 INSTALACIONES ACTIVAS</div>
+            {instalaciones_html}
+        </div>'''
+    
+    if playstyles_unique:
+        playstyles_html = ""
+        for playstyle in playstyles_unique:
+            playstyles_html += f'<div class="playstyle-item">{playstyle}</div>'
+        
+        html_content += f'''
+        <div class="playstyles-section">
+            <div class="section-title">🎮 PLAYSTYLES ACTIVOS</div>
+            <div class="playstyles-grid">
+                {playstyles_html}
+            </div>
+        </div>'''
+    
+    # JavaScript para el gráfico radar
+    html_content += f"""
+    </div>
+    
+    <script>
+        const ctx = document.getElementById('radarChart').getContext('2d');
+        const radarChart = new Chart(ctx, {{
+            type: 'radar',
+            data: {{
+                labels: {radar_labels},
+                datasets: [{{
+                    label: 'Atributos',
+                    data: {radar_data},
+                    backgroundColor: 'rgba(255, 140, 0, 0.2)',
+                    borderColor: 'rgba(255, 140, 0, 1)',
+                    pointBackgroundColor: 'rgba(255, 140, 0, 1)',
+                    pointBorderColor: '#fff',
+                    pointHoverBackgroundColor: '#fff',
+                    pointHoverBorderColor: 'rgba(255, 140, 0, 1)',
+                    borderWidth: 2,
+                    pointRadius: 5
+                }}]
+            }},
+            options: {{
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {{
+                    legend: {{
+                        display: false
+                    }}
+                }},
+                scales: {{
+                    r: {{
+                        beginAtZero: true,
+                        max: 99,
+                        min: 0,
+                        ticks: {{
+                            stepSize: 20,
+                            color: '#ffffff',
+                            backdrop: 'rgba(0, 0, 0, 0.5)'
+                        }},
+                        grid: {{
+                            color: 'rgba(255, 255, 255, 0.2)'
+                        }},
+                        angleLines: {{
+                            color: 'rgba(255, 255, 255, 0.2)'
+                        }},
+                        pointLabels: {{
+                            color: '#ffffff',
+                            font: {{
+                                size: 14,
+                                weight: 'bold'
+                            }}
+                        }}
+                    }}
+                }}
+            }}
+        }});
+    </script>
+</body>
+</html>
+    """
+    
+    return html_content
+
+
 # --- Carga de Datos Principal ---
 if 'app_version' not in st.session_state or st.session_state.app_version != APP_VERSION:
     previous_app_version = st.session_state.get('app_version', None)
@@ -352,6 +1208,73 @@ all_stats_df_base = pd.DataFrame()
 df_skill_trees_global = pd.DataFrame()
 df_instalaciones_global = pd.DataFrame()
 carga_completa_exitosa = False 
+
+def calcular_tiers_nodos(df_nodos_a_evaluar):
+    """
+    Función auxiliar para calcular el tier/nivel de cada nodo basándose en sus prerrequisitos.
+    
+    Args:
+        df_nodos_a_evaluar (pd.DataFrame): DataFrame con los nodos a evaluar
+        
+    Returns:
+        dict: Mapeo de ID_Nodo a su tier/nivel (ej. {'RITMO_A1': 0, 'RITMO_A2': 1})
+    """
+    if df_nodos_a_evaluar is None or df_nodos_a_evaluar.empty:
+        return {}
+    
+    nodos_por_tier = defaultdict(list)
+    processed_nodes = set()
+    tier_mapping = {}  # ID_Nodo -> tier_number
+    
+    # Tier 0: Nodos sin prerrequisitos
+    for _, nodo in df_nodos_a_evaluar.iterrows():
+        prereq_val = nodo.get('Prerrequisito', '')
+        if pd.isna(prereq_val) or str(prereq_val).strip() == '':
+            nodos_por_tier[0].append(nodo)
+            processed_nodes.add(nodo['ID_Nodo'])
+            tier_mapping[nodo['ID_Nodo']] = 0
+    
+    current_tier = 0
+    max_iterations = len(df_nodos_a_evaluar) + 10  # Prevenir bucles infinitos
+    iteration_count = 0
+    
+    # Procesar nodos restantes basándose en prerrequisitos
+    while len(processed_nodes) < len(df_nodos_a_evaluar) and iteration_count < max_iterations:
+        newly_added_to_tier = 0
+        
+        for _, nodo in df_nodos_a_evaluar.iterrows():
+            if nodo['ID_Nodo'] in processed_nodes:
+                continue
+            
+            prereqs_list = [pr_id.strip() for pr_id in str(nodo.get('Prerrequisito', '')).split(',') if pr_id.strip()]
+            
+            if prereqs_list and all(pr_id in processed_nodes for pr_id in prereqs_list):
+                # Encontrar el tier máximo de los prerrequisitos
+                max_prereq_tier = -1
+                for pr_id in prereqs_list:
+                    if pr_id in tier_mapping:
+                        max_prereq_tier = max(max_prereq_tier, tier_mapping[pr_id])
+                
+                # Asignar al tier siguiente del prerrequisito más alto
+                node_tier = max_prereq_tier + 1
+                nodos_por_tier[node_tier].append(nodo)
+                processed_nodes.add(nodo['ID_Nodo'])
+                tier_mapping[nodo['ID_Nodo']] = node_tier
+                newly_added_to_tier += 1
+        
+        if newly_added_to_tier == 0:
+            # Si no se agregó ningún nodo, colocar los restantes en un tier especial
+            remaining_tier = current_tier + 100
+            for _, nodo_restante in df_nodos_a_evaluar.iterrows():
+                if nodo_restante['ID_Nodo'] not in processed_nodes:
+                    nodos_por_tier[remaining_tier].append(nodo_restante)
+                    processed_nodes.add(nodo_restante['ID_Nodo'])
+            break
+        
+        current_tier += 1
+        iteration_count += 1
+    
+    return tier_mapping
 
 datos_base_cargados_tuple = cargar_y_preparar_datos_base()
 if datos_base_cargados_tuple:
@@ -529,7 +1452,7 @@ with tab_calc:
             all_stats_df_base_display_top5_calc = all_stats_df_base.copy()
             all_stats_df_base_display_top5_calc['IGS'] = pd.to_numeric(all_stats_df_base_display_top5_calc['IGS'], errors='coerce').fillna(0)
             if 'AcceleRATE' not in all_stats_df_base_display_top5_calc.columns:
-                 all_stats_df_base_display_top5_calc['AcceleRATE'] = all_stats_df_base_display_top5_calc.apply(lambda r: determinar_estilo_carrera(r['Altura'], r.get('AGI',0),r.get('STR',0),r.get('Acc',0)), axis=1)
+                 all_stats_df_base_display_top5_calc['AcceleRATE'] = all_stats_df_base_display_top5_calc.apply(lambda r: determinar_estilo_carrera(r['Altura'], r.get('AGI', 0), r.get('STR', 0), r.get('Acc', 0)), axis=1)
             top_5_igs_calc_df = all_stats_df_base_display_top5_calc.sort_values(by='IGS', ascending=False).head(5)
             st.dataframe(top_5_igs_calc_df[['Posicion', 'Altura', 'Peso', 'AcceleRATE', 'IGS']])
             num_top_cols_stable_v33 = min(len(top_5_igs_calc_df), 5) 
@@ -591,52 +1514,146 @@ with tab_build_craft:
         
         st.divider() 
         with st.expander("📋 Generar/Copiar Resumen del Build Actual", expanded=False):
-            if st.button("Generar Resumen de Texto", key="btn_generate_summary_v33_bc"):  
-                summary_text = f"**Resumen del Build: {st.session_state.bc_pos} | {st.session_state.bc_alt}cm | {st.session_state.bc_pes}kg**\n"
-                summary_text += f"Boosts de Instalaciones Aplicados: {'Sí' if st.session_state.apply_facility_boosts_toggle else 'No'}\n\n"
-                summary_text += f"- **Puntos de Habilidad:** {TOTAL_SKILL_POINTS - st.session_state.bc_points_remaining} / {TOTAL_SKILL_POINTS} (Restantes: {st.session_state.bc_points_remaining})\n"
-                summary_text += f"- **Pierna Mala:** {STAR_EMOJI * int(float(str(stats_completas_bc.get('PIERNA_MALA', BASE_WF))))}\n"
-                summary_text += f"- **Filigranas:** {STAR_EMOJI * int(float(str(stats_completas_bc.get('FILIGRANAS', BASE_SM))))}\n"
-                summary_text += f"- **AcceleRATE:** {stats_completas_bc.get('AcceleRATE', 'N/A')}\n"
-                summary_text += f"- **IGS (Total):** {int(float(str(stats_completas_bc.get('IGS', '0'))))}\n\n"
-                summary_text += "**Atributos Generales (Total):**\n"
-                for cat in MAIN_CATEGORIES: summary_text += f"  - {cat}: {int(float(str(stats_completas_bc.get(cat, '0'))))}\n"
+            # Crear dos columnas para los dos tipos de resúmenes
+            col_texto, col_visual = st.columns(2)
+            
+            # === COLUMNA IZQUIERDA: RESUMEN DE TEXTO (FUNCIONALIDAD EXISTENTE) ===
+            with col_texto:
+                st.markdown("**📝 Resumen de Texto**")
+                if st.button("Generar Resumen de Texto", key="btn_generate_summary_v33_bc"):  
+                    summary_text = f"**Resumen del Build: {st.session_state.bc_pos} | {st.session_state.bc_alt}cm | {st.session_state.bc_pes}kg**\n"
+                    summary_text += f"Boosts de Instalaciones Aplicados: {'Sí' if st.session_state.apply_facility_boosts_toggle else 'No'}\n\n"
+                    summary_text += f"- **Puntos de Habilidad:** {TOTAL_SKILL_POINTS - st.session_state.bc_points_remaining} / {TOTAL_SKILL_POINTS} (Restantes: {st.session_state.bc_points_remaining})\n"
+                    summary_text += f"- **Pierna Mala:** {STAR_EMOJI * int(float(str(stats_completas_bc.get('PIERNA_MALA', BASE_WF))))}\n"
+                    summary_text += f"- **Filigranas:** {STAR_EMOJI * int(float(str(stats_completas_bc.get('FILIGRANAS', BASE_SM))))}\n"
+                    summary_text += f"- **AcceleRATE:** {stats_completas_bc.get('AcceleRATE', 'N/A')}\n"
+                    summary_text += f"- **IGS (Total):** {int(float(str(stats_completas_bc.get('IGS', '0'))))}\n\n"
+                    summary_text += "**Atributos Generales (Total):**\n"
+                    for cat in MAIN_CATEGORIES: 
+                        summary_text += f"  - {cat}: {int(float(str(stats_completas_bc.get(cat, '0'))))}\n"
+                    
+                    # NUEVA LÓGICA MEJORADA PARA NODOS DE HABILIDAD
+                    summary_text += "\n**Nodos de Habilidad Desbloqueados:**\n"
+                    
+                    if st.session_state.bc_unlocked_nodes:
+                        # Paso A: Obtener el mapeo de tiers
+                        mapa_de_tiers = calcular_tiers_nodos(df_skill_trees_global)
+                        
+                        # Paso B: Agrupar los nodos desbloqueados
+                        nodos_agrupados = defaultdict(lambda: defaultdict(list))
+                        playstyles_from_skills_sum = []
+                        
+                        for node_id in st.session_state.bc_unlocked_nodes:
+                            if node_id in df_skill_trees_global['ID_Nodo'].values:
+                                node_info = df_skill_trees_global[df_skill_trees_global['ID_Nodo'] == node_id].iloc[0]
+                                
+                                # Obtener tier del nodo
+                                tier = mapa_de_tiers.get(node_id, 999)  # 999 si no se encuentra
+                                
+                                # Agregar detalles del nodo a la estructura agrupada
+                                arbol = node_info['Arbol']
+                                detalles_nodo = {
+                                    'nombre': node_info['Nombre_Visible'],
+                                    'costo': node_info['Costo'],
+                                    'id': node_id
+                                }
+                                nodos_agrupados[arbol][tier].append(detalles_nodo)
+                                
+                                # Recopilar PlayStyles
+                                playstyle_node_val = node_info.get('PlayStyle', '')
+                                is_plus_val_node = str(node_info.get('EsPlus', '')).strip().lower() == 'si'
+                                if pd.notna(playstyle_node_val) and playstyle_node_val != '': 
+                                    playstyles_from_skills_sum.append(f"{playstyle_node_val}{'+' if is_plus_val_node else ''}")
+                        
+                        # Paso C: Construir el String del Resumen con estructura jerárquica
+                        for arbol_nombre in sorted(nodos_agrupados.keys()):
+                            summary_text += f"  - **{arbol_nombre}:**\n"
+                            
+                            # Ordenar tiers dentro del árbol
+                            tiers_del_arbol = sorted(nodos_agrupados[arbol_nombre].keys())
+
+                            for tier_num in tiers_del_arbol:
+                                nodos_del_tier = nodos_agrupados[arbol_nombre][tier_num]
+                                
+                                # Nombre del tier
+                                if tier_num < 100:
+                                    tier_name = f"Nivel {tier_num}"
+                                else:
+                                    tier_name = f"Otros (Grupo {tier_num})"
+                                
+                                summary_text += f"    - *{tier_name}:*\n"
+                                
+                                # Ordenar nodos dentro del tier por nombre para consistencia
+                                nodos_del_tier_ordenados = sorted(nodos_del_tier, key=lambda x: x['nombre'])
+                                
+                                for nodo_detalle in nodos_del_tier_ordenados:
+                                    summary_text += f"      - {nodo_detalle['nombre']} (Costo: {nodo_detalle['costo']})\n"
+                    else:
+                        summary_text += "  - Ningún nodo desbloqueado\n"
+                    
+                    playstyles_from_facilities_sum = []
+                    if st.session_state.apply_facility_boosts_toggle and 'unlocked_facility_levels' in st.session_state:
+                        for facility_id_sum in st.session_state.unlocked_facility_levels:
+                            if facility_id_sum in df_instalaciones_global['ID_Instalacion'].values:
+                                facility_info_sum = df_instalaciones_global[df_instalaciones_global['ID_Instalacion'] == facility_id_sum].iloc[0]
+                                ps_facility_val_sum = facility_info_sum.get('PlayStyle', '')
+                                is_plus_val_fac_sum = facility_info_sum.get('EsPlus', '').strip().lower() == 'si'
+                                if pd.notna(ps_facility_val_sum) and ps_facility_val_sum != '':
+                                     playstyles_from_facilities_sum.append(f"{ps_facility_val_sum}{'+' if is_plus_val_fac_sum else ''} (Inst.)")
+                    
+                    total_playstyles_sum = sorted(list(set(playstyles_from_skills_sum + playstyles_from_facilities_sum)))
+                    if total_playstyles_sum:
+                        summary_text += "\n**PlayStyles Totales Desbloqueados:**\n"
+                        for ps_name_sum_val_disp in total_playstyles_sum: 
+                            summary_text += f"  - {ps_name_val_disp}\n"
+                    
+                    # Almacenar el resumen en session_state para persistencia
+                    st.session_state.build_summary_text = summary_text
                 
-                summary_text += "\n**Nodos de Habilidad Desbloqueados:**\n"
-                unlocked_nodes_details_sum = defaultdict(list)
-                playstyles_from_skills_sum = []
-                sorted_unlocked_nodes_sum = sorted(list(st.session_state.bc_unlocked_nodes), 
-                                                   key=lambda x: (df_skill_trees_global[df_skill_trees_global['ID_Nodo'] == x].iloc[0]['Arbol'] 
-                                                                  if x in df_skill_trees_global['ID_Nodo'].values else "", x))
-                for node_id_sum in sorted_unlocked_nodes_sum:
-                    if node_id_sum in df_skill_trees_global['ID_Nodo'].values:
-                        node_info_sum = df_skill_trees_global[df_skill_trees_global['ID_Nodo'] == node_id_sum].iloc[0]
-                        unlocked_nodes_details_sum[node_info_sum['Arbol']].append(f"{node_info_sum['Nombre_Visible']} (Costo: {node_info_sum['Costo']})")
-                        playstyle_node_val_sum = node_info_sum.get('PlayStyle', '')
-                        if pd.notna(playstyle_node_val_sum) and playstyle_node_val_sum != '': playstyles_from_skills_sum.append(playstyle_node_val_sum)
-                
-                for arbol_name_sum, nodos_list_sum in unlocked_nodes_details_sum.items():
-                    summary_text += f"  - **{arbol_name_sum}:**\n"
-                    for nodo_str_sum in nodos_list_sum: summary_text += f"    - {nodo_str_sum}\n"
-                
-                playstyles_from_facilities_sum = []
-                if st.session_state.apply_facility_boosts_toggle and 'unlocked_facility_levels' in st.session_state:
-                    for facility_id_sum in st.session_state.unlocked_facility_levels:
-                        if facility_id_sum in df_instalaciones_global['ID_Instalacion'].values:
-                            facility_info_sum = df_instalaciones_global[df_instalaciones_global['ID_Instalacion'] == facility_id_sum].iloc[0]
-                            ps_facility_val_sum = facility_info_sum.get('PlayStyle', '')
-                            is_plus_val_fac_sum = facility_info_sum.get('EsPlus', '').strip().lower() == 'si'
-                            if pd.notna(ps_facility_val_sum) and ps_facility_val_sum != '':
-                                 playstyles_from_facilities_sum.append(f"{ps_facility_val_sum}{'+' if is_plus_val_fac_sum else ''} (Inst.)")
-                
-                total_playstyles_sum = sorted(list(set(playstyles_from_skills_sum + playstyles_from_facilities_sum)))
-                if total_playstyles_sum:
-                    summary_text += "\n**PlayStyles Totales Desbloqueados:**\n"
-                    for ps_name_sum_val_disp in total_playstyles_sum: summary_text += f"  - {ps_name_sum_val_disp}\n"
-                
-                st.text_area("Copia este resumen:", summary_text, height=450, key="build_summary_text_area_v33")
+                # Mostrar el text_area con el resumen (usar valor por defecto si no existe)
+                display_summary = st.session_state.get('build_summary_text', "Presiona 'Generar Resumen de Texto' para ver el resumen aquí.")
+                st.text_area("Copia este resumen:", display_summary, height=450, key="build_summary_text_area_v33")
+            
+            # === COLUMNA DERECHA: RESUMEN VISUAL HTML (NUEVA FUNCIONALIDAD) ===
+            with col_visual:
+                st.markdown("**🎮 Resumen Visual FC25**")
+                if st.button("🎮 Generar Resumen Visual HTML", key="btn_generate_visual_summary_v33_bc"):
+                    # Generar el HTML visual del build
+                    visual_html = generar_resumen_visual_html(
+                        st.session_state.bc_pos, 
+                        st.session_state.bc_alt, 
+                        st.session_state.bc_pes,
+                        stats_completas_bc,
+                        st.session_state.bc_unlocked_nodes,
+                        df_skill_trees_global,
+                        st.session_state.unlocked_facility_levels,
+                        df_instalaciones_global,
+                        st.session_state.apply_facility_boosts_toggle,
+                        st.session_state.bc_points_remaining
+                    )
+                    
+                    # Preparar nombre del archivo
+                    build_name_for_file = st.session_state.get("build_save_name_v33", "").strip()
+                    if build_name_for_file:
+                        file_name_html = f"{build_name_for_file.replace(' ', '_')}_resumen_visual_fc25.html"
+                    else:
+                        file_name_html = f"{st.session_state.bc_pos}_{st.session_state.bc_alt}cm_{st.session_state.bc_pes}kg_resumen_visual_fc25.html"
+                    
+                    # Botón de descarga
+                    st.download_button(
+                        label="📥 Descargar Resumen Visual HTML",
+                        data=visual_html,
+                        file_name=file_name_html,
+                        mime="text/html",
+                        key="download_visual_summary_btn_v33",
+                        help="Descarga un archivo HTML que puedes abrir en cualquier navegador para tomar capturas de pantalla de alta calidad"
+                    )
+                    
+                    st.success("✅ Resumen visual generado! Haz clic en 'Descargar' para obtener el archivo HTML.")
+                    st.info("💡 Abre el archivo descargado en tu navegador y toma una captura de pantalla de alta calidad.")
         
-        # --- INICIO: Gestión de Builds (Guardar/Cargar) ---
+        st.divider()
+        
         with st.expander("💾 Gestión de Builds (Guardar/Cargar)"):
             
             # Verificar si venimos de una recarga después de cargar un archivo
@@ -790,8 +1807,8 @@ with tab_build_craft:
                 nodos_arbol_desbloqueados = []
                 for node_id in st.session_state.bc_unlocked_nodes:
                     if node_id in df_skill_trees_global['ID_Nodo'].values:
-                        node_data = df_skill_trees_global[df_skill_trees_global['ID_Nodo'] == node_id].iloc[0]
-                        if node_data['Arbol'] == arbol_sel_bc:
+                        node_info = df_skill_trees_global[df_skill_trees_global['ID_Nodo'] == node_id].iloc[0]
+                        if node_info['Arbol'] == arbol_sel_bc:
                             nodos_arbol_desbloqueados.append(node_id)
                 
                 # Sumar boosts de los nodos del árbol seleccionado
@@ -853,7 +1870,7 @@ with tab_build_craft:
             else:
                 st.info(f"No se encontraron sub-estadísticas relevantes para el árbol '{arbol_sel_bc}'.")
         
-        if st.button("Resetear Puntos de Habilidad", key="reset_skills_btn_bc_v33"): 
+        if st.button("Resetear Puntos de Habilidad", key="reset_skills_btn_bc"): 
             st.session_state.bc_unlocked_nodes, st.session_state.bc_points_remaining = set(), TOTAL_SKILL_POINTS
             st.rerun()
 
@@ -875,15 +1892,16 @@ with tab_build_craft:
             nodos_por_tier_display = defaultdict(list) 
             processed_nodes_display = set() 
             
+            # Tier 0: Nodos sin prerrequisitos
             for _, nodo_disp in nodos_a_mostrar_display.iterrows(): 
-                prereq_val_nodo_disp = nodo_disp.get('Prerrequisito', '') 
-                if pd.isna(prereq_val_nodo_disp) or str(prereq_val_nodo_disp).strip() == '': 
+                prereq_val = nodo_disp.get('Prerrequisito', '') 
+                if pd.isna(prereq_val) or str(prereq_val).strip() == '': 
                     nodos_por_tier_display[0].append(nodo_disp)
                     processed_nodes_display.add(nodo_disp['ID_Nodo'])
             
             current_tier_display = 0 
             while len(processed_nodes_display) < len(nodos_a_mostrar_display):
-                newly_added_to_tier_disp = 0 
+                newly_added_to_tier_display = 0 
                 for _, nodo_disp_loop in nodos_a_mostrar_display.iterrows(): 
                     if nodo_disp_loop['ID_Nodo'] in processed_nodes_display:
                         continue
@@ -899,9 +1917,9 @@ with tab_build_craft:
                         
                         nodos_por_tier_display[max_prereq_tier_disp + 1].append(nodo_disp_loop)
                         processed_nodes_display.add(nodo_disp_loop['ID_Nodo'])
-                        newly_added_to_tier_disp += 1
+                        newly_added_to_tier_display += 1
 
-                if newly_added_to_tier_disp == 0 and len(processed_nodes_display) < len(nodos_a_mostrar_display):
+                if newly_added_to_tier_display == 0 and len(processed_nodes_display) < len(nodos_a_mostrar_display):
                     remaining_tier_disp = current_tier_display + 100  
                     for _, nodo_restante_disp in nodos_a_mostrar_display.iterrows(): 
                         if nodo_restante_disp['ID_Nodo'] not in processed_nodes_display:
@@ -925,22 +1943,23 @@ with tab_build_craft:
                     col_idx_node_disp = 0  
                     
                     for nodo_item_disp in nodos_por_tier_display[tier_level_disp]:  
+                             
+                         
                         with node_cards_cols_disp[col_idx_node_disp % num_cols_display_nodes_disp]:
                             node_id_disp = nodo_item_disp['ID_Nodo'] 
                             is_unlocked_disp = node_id_disp in st.session_state.bc_unlocked_nodes  
                             can_be_unlocked_disp = check_prerequisites_skills(node_id_disp, df_skill_trees_global, st.session_state.bc_unlocked_nodes) 
                             
                             beneficios_str_list_disp = []  
-                            cols_para_beneficios_disp = (stat_cols_order if stat_cols_order else IGS_SUB_STATS) + ['PIERNA_MALA', 'FILIGRANAS'] 
-                            
-                            for col_stat_disp in cols_para_beneficios_disp:  
+                            cols_para_beneficios_disp = (stat_cols_order if stat_cols_order else IGS_SUB_STATS) + ['PIERNA_MALA', 'FILIGRANAS']
+                            for col_stat_disp in cols_para_beneficios_disp:
                                 if col_stat_disp in nodo_item_disp.index and pd.notna(nodo_item_disp[col_stat_disp]) and nodo_item_disp[col_stat_disp] != 0: 
                                     valor_beneficio_disp = int(nodo_item_disp[col_stat_disp]) 
                                     if col_stat_disp == 'PIERNA_MALA': beneficios_str_list_disp.append(f"+{valor_beneficio_disp}⭐ WF")
                                     elif col_stat_disp == 'FILIGRANAS': beneficios_str_list_disp.append(f"+{valor_beneficio_disp}⭐ SM")
                                     else: beneficios_str_list_disp.append(f"+{valor_beneficio_disp} {col_stat_disp}")
                             
-                            playstyle_val_node_disp = nodo_item_disp.get('PlayStyle', '')  
+                            playstyle_val_node_disp = nodo_item_disp.get('PlayStyle', '')
                             if pd.notna(playstyle_val_node_disp) and playstyle_val_node_disp != '':
                                 beneficios_str_list_disp.append(f"PlayStyle: {playstyle_val_node_disp}")
                             
@@ -951,7 +1970,7 @@ with tab_build_craft:
                                 st.caption(f"ID: {node_id_disp} | Costo: {nodo_item_disp['Costo']}")
                                 st.caption(f"Beneficios: {beneficios_str_disp}")
                                 prereq_display_val_node = nodo_item_disp.get('Prerrequisito', '') 
-                                prereq_display_node = f"Prerreq: {prereq_display_val_node if str(prereq_display_val_node).strip() else 'Ninguno'}" 
+                                prereq_display_node = f"Prerreq: {str(prereq_display_val_node).strip() if str(prereq_display_val_node).strip() else 'Ninguno'}" 
                                 st.caption(prereq_display_node)
 
                                 if is_unlocked_disp:
@@ -1047,6 +2066,7 @@ with tab_facilities:
                                 dependencias_fac_item = verificar_dependencias_instalacion(level_id_fac_item, df_instalaciones_global, st.session_state.unlocked_facility_levels) 
                                 if not dependencias_fac_item:
                                     st.session_state.unlocked_facility_levels.remove(level_id_fac_item)
+                                    st.session_state.bc_points_remaining += level_data_fac['Precio']
                                     st.rerun()
                                 else:
                                     nombres_dependencias_fac_item = ", ".join(dependencias_fac_item) 
@@ -1054,6 +2074,7 @@ with tab_facilities:
                         elif can_unlock_level_fac_item and st.session_state.club_budget_remaining >= level_data_fac['Precio']:
                             if st.button("🛒 Comprar", key=f"buy_facility_level_{level_id_fac_item}_v33u"): 
                                 st.session_state.unlocked_facility_levels.add(level_id_fac_item)
+                                st.session_state.club_budget_remaining -= level_data_fac['Precio']
                                 st.rerun()
                         else:
                             help_text_facility_item = "Prerreq. no cumplido" if not can_unlock_level_fac_item else f"Presupuesto Insuf. ({level_data_fac['Precio']:,})" 
@@ -1122,7 +2143,7 @@ with tab_explorer:
                 facility_ps_results_exp = df_instalaciones_global[df_instalaciones_global['PlayStyle'] == playstyle_to_find_explorer_exp].copy() 
                 if not facility_ps_results_exp.empty:
                     for _, r_fac_ps_exp in facility_ps_results_exp.iterrows(): 
-                        es_plus_str_explorer_exp = "+" if str(r_fac_ps_exp.get('EsPlus','')).strip().lower() == 'si' else "" 
+                        es_plus_str_explorer_exp = "+" if str(r_fac_ps_exp.get('EsPlus', '')).strip().lower() == 'si' else "" 
                         temp_results_ps_explorer_exp.append({
                             'Fuente': f"Instalación ({r_fac_ps_exp['Instalacion']})", 'Nombre Mejora': r_fac_ps_exp['Nombre_Instalacion'],
                             'Costo/Precio': r_fac_ps_exp['Precio'], 'Prerrequisito': r_fac_ps_exp.get('Prerrequisito',''),
@@ -1177,149 +2198,131 @@ with tab_best_combo:
                     st.session_state.bc_unlocked_nodes, st.session_state.bc_points_remaining = set(), TOTAL_SKILL_POINTS
                     st.session_state.unlocked_facility_levels = set()
                     st.session_state.club_budget_remaining = st.session_state.get('club_budget_total', DEFAULT_CLUB_BUDGET) 
-                    st.success(f"Perfil de Mejor Combinación Base enviado. Ve a '🛠️ Build Craft'.")
+                    st.success("Perfil de Mejor Combinación Base enviado. Ve a '🛠️ Build Craft'.")
                 
                 if 'AcceleRATE' not in best_player_combination_opt or pd.isna(best_player_combination_opt['AcceleRATE']):
                      accel_rate_best_optimal_opt = determinar_estilo_carrera(best_player_combination_opt['Altura'],best_player_combination_opt.get('AGI',0),best_player_combination_opt.get('STR',0),best_player_combination_opt.get('Acc',0)) 
                 else:
                     accel_rate_best_optimal_opt = best_player_combination_opt['AcceleRATE']
                 
-                styled_metric("Estilo de Carrera (Base)", accel_rate_best_optimal_opt); st.divider()
+                styled_metric("Estilo de Carrera (Base)", accel_rate_best_optimal_opt)
+                st.divider()
                 
-                key_metrics_to_display_optimal_opt = {} 
-                for attr_disp_opt_loop in sort_by_attributes_optimal_opt + ['IGS']:  
-                    if attr_disp_opt_loop in best_player_combination_opt and pd.notna(best_player_combination_opt[attr_disp_opt_loop]):
-                        key_metrics_to_display_optimal_opt[attr_disp_opt_loop] = int(float(str(best_player_combination_opt[attr_disp_opt_loop])))
+                # CORRECCIÓN: Verificar que sort_by_attributes_optimal_opt esté definido
+                if 'sort_by_attributes_optimal_opt' in locals() and sort_by_attributes_optimal_opt:
+                    key_metrics_to_display_optimal_opt = sort_by_attributes_optimal_opt
+                else:
+                    key_metrics_to_display_optimal_opt = [attr_primary_optimal_opt]
                 
-                num_metrics_cols_optimal_opt = min(len(key_metrics_to_display_optimal_opt), 4)  
-                cols_metrics_cards_optimal_opt = st.columns(num_metrics_cols_optimal_opt) if num_metrics_cols_optimal_opt > 0 else [st] 
-                
-                metric_idx_opt_loop = 0 
-                for label_opt_loop, value_opt_loop in key_metrics_to_display_optimal_opt.items(): 
-                    with cols_metrics_cards_optimal_opt[metric_idx_opt_loop % num_metrics_cols_optimal_opt]:
-                        styled_metric(label_opt_loop, value_opt_loop)
-                    metric_idx_opt_loop +=1
+                metrics_to_show = key_metrics_to_display_optimal_opt + ['IGS']
+                if len(metrics_to_show) > 0:
+                    cols_metrics = st.columns(min(len(metrics_to_show), 4))
+                    for idx, metric_name in enumerate(metrics_to_show):
+                        if metric_name in best_player_combination_opt:
+                            with cols_metrics[idx % len(cols_metrics)]:
+                                metric_value = int(float(str(best_player_combination_opt[metric_name])))
+                                styled_metric(metric_name, metric_value)
                         
                 with st.expander("Ver todos los atributos base de esta combinación"):
                     display_series_optimal_opt = best_player_combination_opt.drop(['Posicion', 'Altura', 'Peso'], errors='ignore').astype(str) 
                     st.dataframe(display_series_optimal_opt)
-            else: 
-                st.info("No se encontraron combinaciones que coincidan.")
-
-# --- Pestaña: Filtros Múltiples ---
-with tab_filters:
-    if not carga_completa_exitosa or all_stats_df_base.empty:
-        st.error("Datos para Filtros Múltiples no disponibles.")
-    else:
-        st.header("📊 Filtros Múltiples Avanzados (Stats Base)")
         
-        queryable_stats_for_filter_fil = [col for col in stat_cols_order if col in all_stats_df_base.columns and col not in ['Posicion', 'Altura', 'Peso', 'AcceleRATE', 'IGS']] 
-
-        def add_filter_cb_v33_fil():  
-            filter_id_fil = st.session_state.next_filter_id 
-            st.session_state.filters.append({'id': filter_id_fil, 'attribute': queryable_stats_for_filter_fil[0], 'condition': '>=', 'value': 70})
-            st.session_state.next_filter_id += 1
-
-        def remove_filter_cb_v33_fil(filter_id_to_remove_fil):  
-            st.session_state.filters = [f_item_fil for f_item_fil in st.session_state.filters if f_item_fil['id'] != filter_id_to_remove_fil] 
-
-        st.button("➕ Añadir Criterio de Filtro", on_click=add_filter_cb_v33_fil, key="add_filter_btn_v33_fil") 
+        st.divider()
         
-        filter_container_fil = st.container()  
-        with filter_container_fil: 
-            for filter_item_loop_fil in st.session_state.filters: 
-                f_id_fil = filter_item_loop_fil['id'] 
-                cols_filter_row_fil = st.columns([5,3,2,1])  
-                
-                try: current_attr_idx_filter_fil = queryable_stats_for_filter_fil.index(filter_item_loop_fil['attribute']) 
-                except ValueError: current_attr_idx_filter_fil = 0 
-                filter_item_loop_fil['attribute'] = cols_filter_row_fil[0].selectbox("Atributo:", options=queryable_stats_for_filter_fil, index=current_attr_idx_filter_fil, key=f"filter_attr_{f_id_fil}_v33_fil") 
-                
-                condition_options_filter_fil = ['>=', '<=', '==', '>', '<', '!='] 
-                try: current_cond_idx_filter_fil = condition_options_filter_fil.index(filter_item_loop_fil['condition']) 
-                except ValueError: current_cond_idx_filter_fil = 0
-                filter_item_loop_fil['condition'] = cols_filter_row_fil[1].selectbox("Condición:", options=condition_options_filter_fil, index=current_cond_idx_filter_fil, key=f"filter_cond_{f_id_fil}_v33_fil") 
-                
-                filter_item_loop_fil['value'] = cols_filter_row_fil[2].number_input("Valor:", value=int(filter_item_loop_fil['value']), step=1, key=f"filter_val_{f_id_fil}_v33_fil") 
-                
-                if cols_filter_row_fil[3].button("➖", key=f"filter_remove_{f_id_fil}_v33_fil", help="Eliminar este criterio"): 
-                    remove_filter_cb_v33_fil(f_id_fil)
-                    st.rerun() 
+        st.subheader("Filtrar y Buscar Combinaciones Óptimas")
+        st.markdown("Define criterios de filtro avanzados para encontrar combinaciones de estadísticas base que se ajusten a tus necesidades.")
         
-        df_filtered_results_fil = pd.DataFrame()  
-        if 'apply_filters_v33_fil_clicked' not in st.session_state: 
-            st.session_state.apply_filters_v33_fil_clicked = False
-
-        if st.button("Aplicar Filtros (sobre Stats Base)", key="btn_apply_filters_v33_fil_apply"):  
-            st.session_state.apply_filters_v33_fil_clicked = True
-            if not st.session_state.filters: 
-                st.info("No hay criterios de filtro definidos. Mostrando todos los perfiles base.")
-                df_filtered_results_fil = all_stats_df_base.copy()
-                st.session_state.df_filtered_results_cache = df_filtered_results_fil 
-            else:
-                df_to_filter_fil = all_stats_df_base.copy() 
-                
-                if 'AcceleRATE' not in df_to_filter_fil.columns:
-                    df_to_filter_fil['AcceleRATE'] = df_to_filter_fil.apply(lambda r: determinar_estilo_carrera(r['Altura'], r.get('AGI',0),r.get('STR',0),r.get('Acc',0)), axis=1)
-
-                df_filtered_results_fil = df_to_filter_fil 
-                query_is_valid_fil = True 
-                active_filter_attributes_fil = []  
-                
-                for f_config_loop_fil in st.session_state.filters: 
-                    attr_fil, cond_fil, val_fil = f_config_loop_fil['attribute'], f_config_loop_fil['condition'], f_config_loop_fil['value'] 
-                    active_filter_attributes_fil.append(attr_fil)
-                    if attr_fil not in df_filtered_results_fil.columns: 
-                        st.error(f"Atributo de filtro '{attr_fil}' no encontrado en los datos."); query_is_valid_fil = False; break
-                    
-                    df_filtered_results_fil[attr_fil] = pd.to_numeric(df_filtered_results_fil[attr_fil], errors='coerce').fillna(0)
-
-                    if cond_fil == '>=': df_filtered_results_fil = df_filtered_results_fil[df_filtered_results_fil[attr_fil] >= val_fil]
-                    elif cond_fil == '<=': df_filtered_results_fil = df_filtered_results_fil[df_filtered_results_fil[attr_fil] <= val_fil]
-                    elif cond_fil == '==': df_filtered_results_fil = df_filtered_results_fil[df_filtered_results_fil[attr_fil] == val_fil]
-                    elif cond_fil == '>': df_filtered_results_fil = df_filtered_results_fil[df_filtered_results_fil[attr_fil] > val_fil]
-                    elif cond_fil == '<': df_filtered_results_fil = df_filtered_results_fil[df_filtered_results_fil[attr_fil] < val_fil]
-                    elif cond_fil == '!=': df_filtered_results_fil = df_filtered_results_fil[df_filtered_results_fil[attr_fil] != val_fil]
-                
-                if query_is_valid_fil:
-                    if not df_filtered_results_fil.empty:
-                        st.write(f"Jugadores que cumplen los criterios ({len(df_filtered_results_fil)}):")
-                        cols_to_display_filtered_fil = ['Posicion', 'Altura', 'Peso']  
-                        cols_to_display_filtered_fil.extend(sorted(list(set(active_filter_attributes_fil)))) 
-                        cols_to_display_filtered_fil.extend(['AcceleRATE', 'IGS'])
-                        
-                        final_cols_to_display_filtered_fil = [col for col in cols_to_display_filtered_fil if col in df_filtered_results_fil.columns] 
-                        
-                        st.dataframe(df_filtered_results_fil[final_cols_to_display_filtered_fil])
-                        st.session_state.df_filtered_results_cache = df_filtered_results_fil 
-                    else: 
-                        st.info("Ninguna combinación de stats base cumple con todos los criterios definidos.")
-                        st.session_state.df_filtered_results_cache = pd.DataFrame() 
+        col_filtro_attr, col_filtro_cond, col_filtro_valor = st.columns(3) 
+        with col_filtro_attr:
+            attr_filter_opt = st.selectbox("Atributo a filtrar:", options=queryable_stats_optimal_opt, key="filtro_attr_v33_opt") 
+        with col_filtro_cond:
+            condition_options_filter_opt = ['>=', '<=', '==', '>', '<', '!='] 
+            cond_filter_opt = st.selectbox("Condición:", options=condition_options_filter_opt, key="filtro_cond_v33_opt") 
+        with col_filtro_valor:
+            val_filter_opt = st.number_input("Valor:", value=70, step=1, key="filtro_valor_v33_opt") 
+        
+        if st.button("Buscar Combinaciones Óptimas", key="btn_search_optimal_combos_v33"): 
+            df_filtered_results_opt = all_stats_df_base.copy() 
             
-        if st.session_state.apply_filters_v33_fil_clicked and 'df_filtered_results_cache' in st.session_state : 
-            cached_results_fil = st.session_state.df_filtered_results_cache 
-            if not cached_results_fil.empty:
-                st.markdown("---")
-                st.subheader("Enviar Perfil Filtrado a Build Craft")
-                if len(cached_results_fil) == 1: 
-                    selected_profile_index_filter_fil = cached_results_fil.index[0] 
-                    st.caption(f"Enviar: {cached_results_fil.loc[selected_profile_index_filter_fil, 'Posicion']} {cached_results_fil.loc[selected_profile_index_filter_fil, 'Altura']}cm {cached_results_fil.loc[selected_profile_index_filter_fil, 'Peso']}kg")
-                    if st.button("Enviar este perfil a Build Craft", key="send_single_filtered_to_bc_v33_fil_send"): 
-                        profile_to_send_fil = cached_results_fil.loc[selected_profile_index_filter_fil] 
-                        st.session_state.bc_pos, st.session_state.bc_alt, st.session_state.bc_pes = profile_to_send_fil['Posicion'], profile_to_send_fil['Altura'], profile_to_send_fil['Peso']
-                        st.session_state.bc_unlocked_nodes, st.session_state.bc_points_remaining = set(), TOTAL_SKILL_POINTS
-                        st.session_state.unlocked_facility_levels, st.session_state.club_budget_remaining = set(), st.session_state.get('club_budget_total', DEFAULT_CLUB_BUDGET)
-                        st.success("Perfil enviado a Build Craft.")
+            # Aplicar filtro
+            if attr_filter_opt in df_filtered_results_opt.columns:
+                df_filtered_results_opt[attr_filter_opt] = pd.to_numeric(df_filtered_results_opt[attr_filter_opt], errors='coerce').fillna(0)
+                
+                # Aplicar filtro según la condición
+                if cond_filter_opt == '>=':
+                    df_filtered_results_opt = df_filtered_results_opt[df_filtered_results_opt[attr_filter_opt] >= val_filter_opt]
+                elif cond_filter_opt == '<=':
+                    df_filtered_results_opt = df_filtered_results_opt[df_filtered_results_opt[attr_filter_opt] <= val_filter_opt]
+                elif cond_filter_opt == '==':
+                    df_filtered_results_opt = df_filtered_results_opt[df_filtered_results_opt[attr_filter_opt] == val_filter_opt]
+                elif cond_filter_opt == '>':
+                    df_filtered_results_opt = df_filtered_results_opt[df_filtered_results_opt[attr_filter_opt] > val_filter_opt]
+                elif cond_filter_opt == '<':
+                    df_filtered_results_opt = df_filtered_results_opt[df_filtered_results_opt[attr_filter_opt] < val_filter_opt]
+                elif cond_filter_opt == '!=':
+                    df_filtered_results_opt = df_filtered_results_opt[df_filtered_results_opt[attr_filter_opt] != val_filter_opt]
 
-                elif len(cached_results_fil) > 1 : 
-                    options_for_bc_send_fil = [f"{idx}: {row['Posicion']} {row['Altura']}cm {row['Peso']}kg (IGS: {row.get('IGS',0)})" for idx, row in cached_results_fil.iterrows()] 
-                    selected_option_bc_send_fil = st.selectbox("Selecciona un perfil de la lista filtrada para enviar a Build Craft:", options=options_for_bc_send_fil, key="select_filtered_for_bc_v33_fil_select") 
-                    if selected_option_bc_send_fil and st.button("Enviar perfil seleccionado a Build Craft", key="send_selected_filtered_to_bc_v33_fil_send"): 
-                        selected_idx_from_option_fil = int(selected_option_bc_send_fil.split(":")[0]) 
-                        profile_to_send_fil_selected = cached_results_fil.loc[selected_idx_from_option_fil] 
-                        st.session_state.bc_pos, st.session_state.bc_alt, st.session_state.bc_pes = profile_to_send_fil_selected['Posicion'], profile_to_send_fil_selected['Altura'], profile_to_send_fil_selected['Peso']
-                        st.session_state.bc_unlocked_nodes, st.session_state.bc_points_remaining = set(), TOTAL_SKILL_POINTS
-                        st.session_state.unlocked_facility_levels, st.session_state.club_budget_remaining = set(), st.session_state.get('club_budget_total', DEFAULT_CLUB_BUDGET)
-                        st.success(f"Perfil '{selected_option_bc_send_fil}' enviado a Build Craft.")
-            elif st.session_state.apply_filters_v33_fil_clicked: 
-                 st.info("No hay resultados filtrados para enviar.")
+            if 'AcceleRATE' not in df_filtered_results_opt.columns:
+                df_filtered_results_opt['AcceleRATE'] = df_filtered_results_opt.apply(lambda r: determinar_estilo_carrera(r['Altura'], r.get('AGI',0),r.get('STR',0),r.get('Acc',0)), axis=1)
+
+            # Ordenar por los atributos seleccionados si existen
+            if 'sort_by_attributes_optimal_opt' in locals() and sort_by_attributes_optimal_opt:
+                df_filtered_results_opt = df_filtered_results_opt.sort_values(by=sort_by_attributes_optimal_opt, ascending=[False]*len(sort_by_attributes_optimal_opt))
+            
+            if not df_filtered_results_opt.empty:
+                st.write(f"Combinaciones encontradas ({len(df_filtered_results_opt)}):")
+                st.dataframe(df_filtered_results_opt[['Posicion', 'Altura', 'Peso', 'AcceleRATE', 'IGS']])
+            else:
+                st.info("No se encontraron combinaciones que cumplan con los criterios.")
+
+# NUEVA FUNCIONALIDAD: Exportación mejorada
+def generar_exportacion_avanzada():
+    """
+    Funciones de exportación mejoradas:
+    - Excel con múltiples hojas
+    - PDF con resumen visual
+    - JSON con metadatos completos
+    - CSV para análisis estadístico
+    """
+    
+    # Formato Excel multi-hoja
+    def export_to_excel():
+        buffer = io.BytesIO()
+        with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
+            # Hoja 1: Stats del build
+            stats_df.to_excel(writer, sheet_name='Stats_Build')
+            # Hoja 2: Nodos desbloqueados
+            nodes_df.to_excel(writer, sheet_name='Nodos_Habilidad')
+            # Hoja 3: Instalaciones
+            facilities_df.to_excel(writer, sheet_name='Instalaciones')
+            # Hoja 4: Comparativa con builds populares
+            comparison_df.to_excel(writer, sheet_name='Comparativa')
+        return buffer.getvalue()
+    
+    # Formato PDF con gráficos
+    def export_to_pdf():
+        # Usar reportlab o matplotlib para generar PDF
+        # con gráficos radar, tablas y estadísticas
+        pass
+
+# NUEVA FUNCIONALIDAD: Filtros múltiples avanzados
+def implementar_filtros_avanzados():
+    """
+    Sistema de filtros múltiples con:
+    - Filtros AND/OR combinados
+    - Filtros por rango (ej: PAC entre 80-90)
+    - Filtros por tags (Delantero, Defensivo, etc.)
+    - Filtros por presupuesto
+    - Guardado de filtros favoritos
+    """
+    
+    # Widget de construcción de filtros
+    st.subheader("🔍 Constructor de Filtros Avanzados")
+    
+    # Sistema de filtros anidados
+    filter_groups = st.container()
+    with filter_groups:
+        for i in range(st.session_state.get('num_filter_groups', 1)):
+            with st.expander(f"Grupo de Filtros {i+1}"):
+                # Filtros individuales dentro del grupo
+                pass

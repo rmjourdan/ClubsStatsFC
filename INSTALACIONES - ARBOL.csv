@@ -16,7 +16,7 @@ TeraD_2,Fisico,Terapeuta Deportivo 2,300000,TeraD_1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 TeraD_3,Fisico,Terapeuta Deportivo 3,300000,TeraD_2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,,,Encarador,No
 CientD_1,Ritmo,Cientifico Deportivo 1,200000,,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,,,,
 CientD_2,Ritmo,Cientifico Deportivo 2,300000,CientD_1,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,0,0,,,,
-CientD_3,Ritmo,Cientifico Deportivo 3,300000,CientD_2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,,,QuicStep,No
+CientD_3,Ritmo,Cientifico Deportivo 3,300000,CientD_2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,,,QuicκStep,No
 EntTacOf_1,Mental,Entrenador Tactico Ofensivo 1,100000,,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,,,,
 EntTacOf_2,Mental,Entrenador Tactico Ofensivo 2,300000,EntTacOf_1,0,0,0,0,0,0,0,0,0,3,0,0,0,0,0,0,3,0,0,0,0,0,0,0,0,0,0,0,0,,,,
 EntTacOf_3,Mental,Entrenador Tactico Ofensivo 3,300000,EntTacOf_2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,,,PaseBalistico,No
