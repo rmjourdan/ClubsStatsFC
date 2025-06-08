@@ -2,15 +2,6 @@ from fastapi import FastAPI, HTTPException
 
 app = FastAPI(title="FC25 Calculator API", version="1.0.0")
 
-@app.get("/")
-def read_root():
-    return {
-        "message": "FC25 Calculator API",
-        "status": "running",
-        "version": "1.0.0",
-        "endpoints": ["/health", "/api/health", "/api/calculate"]
-    }
-
 @app.get("/health")
 def health():
     return {"status": "ok", "message": "API funcionando correctamente"}
