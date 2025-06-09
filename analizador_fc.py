@@ -12,10 +12,10 @@ from visualizacion_fc25_style import mostrar_visualizacion_fc25  # NUEVO: import
 STAR_EMOJI = "⭐" 
 
 # --- Configuración de la Página de Streamlit ---
-st.set_page_config(page_title="Calculadora Stats FC25 v3.3", layout="wide") 
+st.set_page_config(page_title="Calculadora Stats FC25 v3.6", layout="wide") 
 
 # --- Definiciones Constantes ---
-APP_VERSION = "v3.3.5" 
+APP_VERSION = "v3.6" 
 BASE_WF, BASE_SM, MAX_STARS, MAX_STAT_VAL = 2, 3, 5, 99
 TOTAL_SKILL_POINTS = 184
 DEFAULT_CLUB_BUDGET = 1750000 
@@ -1201,6 +1201,22 @@ def generar_resumen_visual_html(pos, altura, peso, stats_completas, unlocked_nod
     
     return html_content
 
+def obtener_stats_jugador(posicion, altura, peso):
+    """Obtiene las stats base para una combinación específica"""
+    return calcular_stats_base_jugador(posicion, altura, peso, stats_base_lb_rb, 
+                                     modificadores_altura, modificadores_peso, diferenciales_posicion)
+
+def aplicar_boosts_a_stats(stats_base, boosts_dict):
+    """Aplica un diccionario de boosts a las stats base"""
+    if stats_base is None:
+        return {}
+    
+    stats_finales = stats_base.copy()
+    for stat, boost in boosts_dict.items():
+        if stat in stats_finales:
+            stats_finales[stat] = min(stats_finales[stat] + boost, 99)
+    
+    return stats_finales
 
 # --- Carga de Datos Principal ---
 if 'app_version' not in st.session_state or st.session_state.app_version != APP_VERSION:
@@ -1372,9 +1388,9 @@ st.session_state.apply_facility_boosts_toggle = st.sidebar.checkbox("Aplicar Boo
                                                                     key="facility_boost_toggle_v33") 
 
 # Definición de Pestañas
-tab_calc, tab_build_craft, tab_facilities, tab_explorer, tab_best_combo, tab_filters = st.tabs([
+tab_calc, tab_build_craft, tab_facilities, tab_explorer, tab_best_combo, tab_filters, tab_reverse = st.tabs([
     "🧮 Calculadora", "🛠️ Build Craft", "🏨 Instalaciones Club", 
-    "🔎 Explorador Mejoras", "🔍 Búsqueda Óptima", "📊 Filtros Múltiples"
+    "🔎 Explorador Mejoras", "🔍 Búsqueda Óptima", "📊 Filtros Múltiples", "🔍 Detector Reverso"
 ])
 
 # --- Pestaña: Calculadora y Comparador ---
@@ -2526,9 +2542,10 @@ with tab_filters:
                 st.markdown("**Distribución por Posiciones:**")
                 pos_counts = df_results['Posicion'].value_counts()
                 st.bar_chart(pos_counts)
-        
-        elif 'filtered_results' in st.session_state and st.session_state.filtered_results.empty:
-            st.info("Los filtros aplicados no produjeron resultados. Intenta ajustar los criterios.")
+            elif 'filtered_results' in st.session_state and st.session_state.filtered_results.empty:
+                st.info("Los filtros aplicados no produjeron resultados. Intenta ajustar los criterios.")
+
+
 # NUEVA FUNCIONALIDAD: Exportación mejorada
 def generar_exportacion_avanzada():
     """
@@ -2580,3 +2597,336 @@ def implementar_filtros_avanzados():
             with st.expander(f"Grupo de Filtros {i+1}"):
                 # Filtros individuales dentro del grupo
                 pass
+
+
+def calcular_boosts_nodos(nodos_ids):
+    """Calcula los boosts totales de una lista de nodos"""
+    boosts = defaultdict(int)
+    
+    if df_skill_trees_global is not None:
+        for node_id in nodos_ids:
+            node_data = df_skill_trees_global[df_skill_trees_global['ID_Nodo'] == node_id]
+            if not node_data.empty:
+                node_info = node_data.iloc[0]
+                for stat_col in ALL_POSSIBLE_STAT_BOOST_COLS_SKILL_TREE:
+                    if stat_col in node_info.index and pd.notna(node_info[stat_col]) and node_info[stat_col] != 0:
+                        if stat_col in IGS_SUB_STATS:  # Solo sub-stats
+                            boosts[stat_col] += int(node_info[stat_col])
+    
+    return dict(boosts)
+
+def calcular_boosts_instalaciones(instalaciones_ids):
+    """Calcula los boosts totales de una lista de instalaciones"""
+    boosts = defaultdict(int)
+    
+    if df_instalaciones_global is not None:
+        for facility_id in instalaciones_ids:
+            facility_data = df_instalaciones_global[df_instalaciones_global['ID_Instalacion'] == facility_id]
+            if not facility_data.empty:
+                facility_info = facility_data.iloc[0]
+                for stat_col in ALL_POSSIBLE_STAT_BOOST_COLS_FACILITIES:
+                    if stat_col in facility_info.index and pd.notna(facility_info[stat_col]) and facility_info[stat_col] != 0:
+                        boosts[stat_col] += int(facility_info[stat_col])
+    
+    return dict(boosts)
+
+def combinar_boosts(boosts1, boosts2):
+    """Combina dos diccionarios de boosts"""
+    combined = defaultdict(int)
+    
+    for stat, boost in boosts1.items():
+        combined[stat] += boost
+    
+    for stat, boost in boosts2.items():
+        combined[stat] += boost
+    
+    return dict(combined)
+
+def calcular_diferencias(stats1, stats2):
+    """Calcula las diferencias entre dos sets de estadísticas"""
+    diferencias = {}
+    for stat in stats2:
+        if stat in stats1:
+            diferencias[stat] = stats1[stat] - stats2[stat]
+    return diferencias
+
+# Nueva pestaña: "🔍 Detector de Build Inverso"
+def implementar_detector_build_inverso():
+    st.header("🔍 Detector de Build Inverso")
+    st.markdown("""
+    **¿Viste un build en el juego y quieres saber el peso exacto y las instalaciones?**
+    
+    Ingresa los datos que puedes ver y nosotros calcularemos lo que falta.
+    """)
+    
+    # --- SECCIÓN 1: DATOS CONOCIDOS ---
+    st.subheader("📋 Datos Conocidos (lo que ves en el juego)")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # Datos básicos
+        reverse_pos = st.selectbox("Posición:", _sorted_lp_sb_init, key="reverse_pos")
+        
+        # CORREGIDO: Altura con opciones disponibles
+        idx_altura_reverse = _unique_alts_sb_init.index(180) if 180 in _unique_alts_sb_init else 0
+        reverse_altura = st.selectbox(
+            "Altura (cm):", 
+            _unique_alts_sb_init, 
+            index=idx_altura_reverse,
+            key="reverse_altura"
+        )
+        
+        # MEJORADO: Nodos conocidos organizados por árbol
+        st.markdown("**Nodos Desbloqueados (que puedes ver):**")
+        reverse_nodes = []
+
+        if df_skill_trees_global is not None:
+            # Agrupar nodos por árbol para facilitar la selección
+            arboles_disponibles = sorted(df_skill_trees_global['Arbol'].unique())
+            
+            with st.expander("Seleccionar nodos por árbol"):
+                for arbol in arboles_disponibles:
+                    nodos_del_arbol = df_skill_trees_global[df_skill_trees_global['Arbol'] == arbol]
+                    
+                    # Crear opciones con nombre visible + ID
+                    opciones_nodos = []
+                    for _, nodo in nodos_del_arbol.iterrows():
+                        nombre_visible = nodo['Nombre_Visible']
+                        id_nodo = nodo['ID_Nodo']
+                        opciones_nodos.append((f"{nombre_visible}", id_nodo))
+                    
+                    nodos_seleccionados = st.multiselect(
+                        f"{arbol}:",
+                        options=[opcion[0] for opcion in opciones_nodos],
+                        key=f"reverse_nodes_{arbol}",
+                        help=f"Nodos desbloqueados en {arbol}"
+                    )
+                    
+                    # Extraer los IDs de los nodos seleccionados
+                    for nombre_seleccionado in nodos_seleccionados:
+                        for opcion in opciones_nodos:
+                            if opcion[0] == nombre_seleccionado:
+                                reverse_nodes.append(opcion[1])
+                                break
+            
+            # Mostrar resumen de nodos seleccionados
+            if reverse_nodes:
+                st.success(f"✅ {len(reverse_nodes)} nodos seleccionados")
+    
+    with col2:
+        # Estadísticas finales visibles
+        st.markdown("**Estadísticas Finales (que ves en el juego):**")
+        
+        reverse_stats = {}
+        for stat in ['PAC', 'SHO', 'PAS', 'DRI', 'DEF', 'PHY']:
+            reverse_stats[stat] = st.number_input(
+                f"{stat}:", 
+                min_value=1, 
+                max_value=99, 
+                value=75, 
+                key=f"reverse_stat_{stat}"
+            )
+        
+        # MEJORADO: Sub-estadísticas organizadas por categoría
+        with st.expander("Sub-estadísticas (opcional - para mayor precisión)"):
+            reverse_substats = {}
+            
+            # Organizar por categorías principales
+            for main_cat, sub_stats_list in SUB_STATS_MAPPING.items():
+                st.markdown(f"**{main_cat}:**")
+                cols_substats = st.columns(min(len(sub_stats_list), 4))
+                
+                for idx, substat in enumerate(sub_stats_list):
+                    with cols_substats[idx % len(cols_substats)]:
+                        reverse_substats[substat] = st.number_input(
+                            f"{substat}:", 
+                            min_value=0, 
+                            max_value=99, 
+                            value=None, 
+                            key=f"reverse_substat_{substat}",
+                            help=f"Sub-estadística de {main_cat}"
+                        )
+    
+    # --- SECCIÓN 2: DETECCIÓN ---
+    if st.button("🔍 Detectar Peso e Instalaciones", key="detect_reverse_build", type="primary"):
+        if reverse_nodes and reverse_stats:
+            with st.spinner("Analizando todas las combinaciones posibles..."):
+                resultados = detectar_build_reverso(
+                    reverse_pos, 
+                    reverse_altura, 
+                    reverse_stats, 
+                    reverse_nodes, 
+                    reverse_substats
+                )
+                
+                mostrar_resultados_deteccion(resultados)
+        else:
+            st.error("Por favor completa al menos la posición, altura, estadísticas principales y algunos nodos.")
+
+def detectar_build_reverso(posicion, altura, stats_objetivo, nodos_conocidos, substats_objetivo=None):
+    """
+    Detecta el peso y posibles instalaciones basándose en los datos conocidos
+    """
+    candidatos = []
+    
+    # Probar todos los pesos posibles
+    for peso in range(60, 101):  # 60-100kg        # Obtener stats base para esta combinación
+        stats_base = calcular_stats_base_jugador(posicion, altura, peso, stats_base_lb_rb, modificadores_altura, modificadores_peso, diferenciales_posicion)
+        if stats_base is None:
+            continue
+        
+        # Calcular boosts de nodos conocidos
+        boosts_nodos = calcular_boosts_nodos(nodos_conocidos)
+        
+        # Probar sin instalaciones
+        stats_sin_instalaciones = aplicar_boosts_a_stats(stats_base, boosts_nodos)
+        precision_sin_inst = calcular_precision_match(stats_sin_instalaciones, stats_objetivo, substats_objetivo)
+        
+        if precision_sin_inst > 0.8:  # 80% de precisión mínima
+            candidatos.append({
+                'peso': peso,
+                'instalaciones': [],
+                'precision': precision_sin_inst,
+                'stats_calculadas': stats_sin_instalaciones,
+                'diferencias': calcular_diferencias(stats_sin_instalaciones, stats_objetivo)
+            })
+        
+        # Probar con instalaciones (las más comunes)
+        if df_instalaciones_global is not None:
+            instalaciones_comunes = obtener_instalaciones_comunes()
+            
+            # Probar combinaciones de instalaciones (máximo 3 para no tardar mucho)
+            from itertools import combinations
+            
+            for num_inst in range(1, 4):  # 1, 2, o 3 instalaciones
+                for combo_instalaciones in combinations(instalaciones_comunes, num_inst):
+                    boosts_instalaciones = calcular_boosts_instalaciones(combo_instalaciones)
+                    boosts_totales = combinar_boosts(boosts_nodos, boosts_instalaciones)
+                    
+                    stats_con_instalaciones = aplicar_boosts_a_stats(stats_base, boosts_totales)
+                    precision_con_inst = calcular_precision_match(stats_con_instalaciones, stats_objetivo, substats_objetivo)
+                    
+                    if precision_con_inst > 0.85:  # Mayor precisión requerida con instalaciones
+                        candidatos.append({
+                            'peso': peso,
+                            'instalaciones': list(combo_instalaciones),
+                            'precision': precision_con_inst,
+                            'stats_calculadas': stats_con_instalaciones,
+                            'diferencias': calcular_diferencias(stats_con_instalaciones, stats_objetivo)
+                        })
+    
+    # Ordenar por precisión
+    candidatos.sort(key=lambda x: x['precision'], reverse=True)
+    return candidatos[:10]  # Top 10 candidatos
+
+def calcular_precision_match(stats_calculadas, stats_objetivo, substats_objetivo=None):
+    """
+    Calcula qué tan bien coinciden las estadísticas calculadas con las objetivo
+    """
+    total_diferencias = 0
+    total_stats = 0
+    
+    # Estadísticas principales
+    for stat, valor_objetivo in stats_objetivo.items():
+        if stat in stats_calculadas:
+            diferencia = abs(stats_calculadas[stat] - valor_objetivo)
+            total_diferencias += diferencia
+            total_stats += 1
+    
+    # Sub-estadísticas (peso mayor en la precisión)
+    if substats_objetivo:
+        for stat, valor_objetivo in substats_objetivo.items():
+            if valor_objetivo is not None and stat in stats_calculadas:
+                diferencia = abs(stats_calculadas[stat] - valor_objetivo)
+                total_diferencias += diferencia * 1.5  # Peso mayor
+                total_stats += 1.5
+    
+    # Convertir diferencias a precisión (0-1)
+    if total_stats == 0:
+        return 0
+    
+    precision = max(0, 1 - (total_diferencias / (total_stats * 10)))  # Normalizar
+    return precision
+
+def mostrar_resultados_deteccion(resultados):
+    """
+    Muestra los resultados de la detección de build inverso
+    """
+    if not resultados:
+        st.error("❌ No se encontraron coincidencias. Verifica los datos ingresados.")
+        return
+    
+    st.success(f"✅ Se encontraron {len(resultados)} posibles configuraciones")
+    
+    # Mostrar top 3 candidatos
+    for i, candidato in enumerate(resultados[:3]):
+        with st.expander(f"🎯 Candidato #{i+1} (Precisión: {candidato['precision']:.1%})", expanded=i==0):
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.markdown("**Configuración Detectada:**")
+                st.metric("Peso", f"{candidato['peso']} kg")
+                
+                if candidato['instalaciones']:
+                    st.markdown("**Instalaciones Activas:**")
+                    for inst_id in candidato['instalaciones']:
+                        inst_info = df_instalaciones_global[df_instalaciones_global['ID_Instalacion'] == inst_id]
+                        if not inst_info.empty:
+                            nombre = inst_info.iloc[0]['Nombre_Instalacion']
+                            st.write(f"• {nombre}")
+                else:
+                    st.info("Sin instalaciones")
+            
+            with col2:
+                st.markdown("**Diferencias por Estadística:**")
+                for stat, diff in candidato['diferencias'].items():
+                    if abs(diff) <= 1:
+                        st.success(f"{stat}: ±{diff}")
+                    elif abs(diff) <= 2:
+                        st.warning(f"{stat}: ±{diff}")
+                    else:
+                        st.error(f"{stat}: ±{diff}")
+            
+            # Botón para enviar a Build Craft
+            if st.button(f"🛠️ Recrear en Build Craft", key=f"recreate_build_{i}"):
+                # Establecer la configuración detectada
+                st.session_state.bc_pos = st.session_state.reverse_pos
+                st.session_state.bc_alt = st.session_state.reverse_altura
+                st.session_state.bc_pes = candidato['peso']
+                st.session_state.bc_unlocked_nodes = set(st.session_state.reverse_nodes)
+                st.session_state.unlocked_facility_levels = set(candidato['instalaciones'])
+                
+                # Recalcular puntos restantes
+                costo_total = sum([
+                    df_skill_trees_global[df_skill_trees_global['ID_Nodo'] == node]['Costo'].iloc[0] 
+                    for node in st.session_state.reverse_nodes 
+                    if not df_skill_trees_global[df_skill_trees_global['ID_Nodo'] == node].empty
+                ])
+                st.session_state.bc_points_remaining = TOTAL_SKILL_POINTS - costo_total
+                
+                st.success("✅ Build recreado en Build Craft. Ve a la pestaña '🛠️ Build Craft'.")
+
+def obtener_instalaciones_comunes():
+    """
+    Obtiene las instalaciones más comúnmente usadas para probar
+    """
+    # Lista de instalaciones comunes (puedes expandir según el meta del juego)
+    instalaciones_populares = [
+        'FISICO_RITMO_1', 'FISICO_RITMO_2', 'FISICO_RITMO_3',
+        'TIRO_POTENCIA_1', 'TIRO_POTENCIA_2', 'TIRO_POTENCIA_3',
+        'DRIBBLING_AGILIDAD_1', 'DRIBBLING_AGILIDAD_2',
+        'PASE_VISION_1', 'PASE_VISION_2',
+        'DEFENSA_MARCAJE_1', 'DEFENSA_MARCAJE_2'
+    ]
+    
+    # Filtrar solo las que existen en el CSV
+    if df_instalaciones_global is not None:
+        existentes = df_instalaciones_global['ID_Instalacion'].tolist()
+        return [inst for inst in instalaciones_populares if inst in existentes]
+    
+    return []
+
+# --- Pestaña: Detector Reverso ---
+with tab_reverse:
+    implementar_detector_build_inverso()
