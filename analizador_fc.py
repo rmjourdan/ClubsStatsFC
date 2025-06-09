@@ -531,32 +531,35 @@ def generar_resumen_visual_html(pos, altura, peso, stats_completas, unlocked_nod
     # Generar sección de instalaciones activas
     instalaciones_html = ""
     if apply_facilities_boost and unlocked_facilities and df_instalaciones is not None:
-        # Agrupar instalaciones por tipo y obtener solo el nivel más alto
+        # Agrupar instalaciones por base de ID (sin el número de nivel)
         facility_groups = {}
         for facility_id in unlocked_facilities:
             facility_data = df_instalaciones[df_instalaciones['ID_Instalacion'] == facility_id]
             if not facility_data.empty:
                 facility_info = facility_data.iloc[0]
-                facility_type = facility_info.get('Instalacion', 'Sin Tipo')
                 
-                if facility_type not in facility_groups:
-                    facility_groups[facility_type] = []
-                facility_groups[facility_type].append({
+                # Extraer la base del ID (ej: "FISICO_RITMO_1" -> "FISICO_RITMO")
+                base_id = '_'.join(facility_id.split('_')[:-1]) if '_' in facility_id and facility_id.split('_')[-1].isdigit() else facility_id
+                
+                if base_id not in facility_groups:
+                    facility_groups[base_id] = []
+                facility_groups[base_id].append({
                     'id': facility_id,
                     'nombre': facility_info.get('Nombre_Instalacion', f'Instalación {facility_id}'),
                     'precio': facility_info.get('Precio', 0),
+                    'nivel': int(facility_id.split('_')[-1]) if '_' in facility_id and facility_id.split('_')[-1].isdigit() else 1,
                     'info': facility_info
                 })
         
         if facility_groups:
-            for facility_type, facilities in facility_groups.items():
-                # Ordenar por precio para obtener el tier más alto
-                facilities_sorted = sorted(facilities, key=lambda x: x['precio'])
+            for base_id, facilities in facility_groups.items():
+                # Ordenar por nivel para obtener el más alto
+                facilities_sorted = sorted(facilities, key=lambda x: x['nivel'])
                 highest_tier = facilities_sorted[-1]
                 
-                # Calcular costos acumulados
+                # Calcular costos acumulados de todos los niveles desbloqueados
                 costos_acumulados = [str(f['precio']) for f in facilities_sorted]
-                costos_str = f"({', '.join(costos_acumulados)})"
+                costos_str = f"({', '.join(costos_acumulados)})" if len(costos_acumulados) > 1 else f"({costos_acumulados[0]})"
                 
                 # Calcular beneficios totales de todos los niveles desbloqueados
                 total_benefits = {}
@@ -592,10 +595,13 @@ def generar_resumen_visual_html(pos, altura, peso, stats_completas, unlocked_nod
                     else:
                         benefits_str = f"[{', '.join(playstyles_facility)}]"
                 
+                # Mostrar nombre base y nivel más alto
+                # nivel_display = f" {highest_tier['nivel']}" if highest_tier['nivel'] > 1 else ""
+                # Mostrar nombre sin añadir nivel (ya está en Nombre_Instalacion)
                 instalaciones_html += f'''
                 <div class="facility-item">
                     <span class="facility-type">🏨 {highest_tier['nombre']}</span>
-                    <span class="facility-price">${highest_tier['precio']:,} {costos_str}</span>
+                    <span class="facility-price">${sum(f['precio'] for f in facilities_sorted):,} {costos_str}</span>
                     <span class="facility-benefits">{benefits_str}</span>
                 </div>'''
 
@@ -1103,12 +1109,12 @@ def generar_resumen_visual_html(pos, altura, peso, stats_completas, unlocked_nod
         {mapa_nodos_html}'''
     
     # Agregar secciones condicionales existentes
-    if nodos_html:
-        html_content += f'''
-        <div class="nodes-section">
-            <div class="section-title">🌳 NODOS DE HABILIDAD DESBLOQUEADOS</div>
-            {nodos_html}
-        </div>'''
+    # if nodos_html:
+    #     html_content += f'''
+    #     <div class="nodes-section">
+    #         <div class="section-title">🌳 NODOS DE HABILIDAD DESBLOQUEADOS</div>
+    #         {nodos_html}
+    #     </div>'''
     
     if instalaciones_html:
         html_content += f'''
@@ -1427,6 +1433,8 @@ with tab_calc:
             st.plotly_chart(fig_radar_comp_calc, use_container_width=True)
         
         valid_player_stats_b_calc = [ps for ps in player_stats_list_base_calc if ps is not None] 
+        
+ 
         valid_player_col_names_b_calc = [player_configs_base_calc[i]['label'] for i, ps in enumerate(player_stats_list_base_calc) if ps is not None] 
         if len(valid_player_stats_b_calc) > 1 :
             compare_dict_b_calc = {name: stats.drop('AcceleRATE', errors='ignore') for name, stats in zip(valid_player_col_names_b_calc, valid_player_stats_b_calc)} 
@@ -1516,11 +1524,10 @@ with tab_build_craft:
         with st.expander("📋 Generar/Copiar Resumen del Build Actual", expanded=False):
             # Crear dos columnas para los dos tipos de resúmenes
             col_texto, col_visual = st.columns(2)
-            
             # === COLUMNA IZQUIERDA: RESUMEN DE TEXTO (FUNCIONALIDAD EXISTENTE) ===
             with col_texto:
                 st.markdown("**📝 Resumen de Texto**")
-                if st.button("Generar Resumen de Texto", key="btn_generate_summary_v33_bc"):  
+                if st.button("Generar Resumen de Texto", key="btn_generate_summary_v33_bc"):
                     summary_text = f"**Resumen del Build: {st.session_state.bc_pos} | {st.session_state.bc_alt}cm | {st.session_state.bc_pes}kg**\n"
                     summary_text += f"Boosts de Instalaciones Aplicados: {'Sí' if st.session_state.apply_facility_boosts_toggle else 'No'}\n\n"
                     summary_text += f"- **Puntos de Habilidad:** {TOTAL_SKILL_POINTS - st.session_state.bc_points_remaining} / {TOTAL_SKILL_POINTS} (Restantes: {st.session_state.bc_points_remaining})\n"
@@ -1535,13 +1542,15 @@ with tab_build_craft:
                     # NUEVA LÓGICA MEJORADA PARA NODOS DE HABILIDAD
                     summary_text += "\n**Nodos de Habilidad Desbloqueados:**\n"
                     
+                    # Inicializar lista de playstyles antes del bloque if
+                    playstyles_from_skills_sum = []
+                    
                     if st.session_state.bc_unlocked_nodes:
                         # Paso A: Obtener el mapeo de tiers
                         mapa_de_tiers = calcular_tiers_nodos(df_skill_trees_global)
                         
                         # Paso B: Agrupar los nodos desbloqueados
                         nodos_agrupados = defaultdict(lambda: defaultdict(list))
-                        playstyles_from_skills_sum = []
                         
                         for node_id in st.session_state.bc_unlocked_nodes:
                             if node_id in df_skill_trees_global['ID_Nodo'].values:
@@ -1582,8 +1591,7 @@ with tab_build_craft:
                                     tier_name = f"Otros (Grupo {tier_num})"
                                 
                                 summary_text += f"    - *{tier_name}:*\n"
-                                
-                                # Ordenar nodos dentro del tier por nombre para consistencia
+                                  # Ordenar nodos dentro del tier por nombre para consistencia
                                 nodos_del_tier_ordenados = sorted(nodos_del_tier, key=lambda x: x['nombre'])
                                 
                                 for nodo_detalle in nodos_del_tier_ordenados:
@@ -1597,7 +1605,7 @@ with tab_build_craft:
                             if facility_id_sum in df_instalaciones_global['ID_Instalacion'].values:
                                 facility_info_sum = df_instalaciones_global[df_instalaciones_global['ID_Instalacion'] == facility_id_sum].iloc[0]
                                 ps_facility_val_sum = facility_info_sum.get('PlayStyle', '')
-                                is_plus_val_fac_sum = facility_info_sum.get('EsPlus', '').strip().lower() == 'si'
+                                is_plus_val_fac_sum = facility_info_sum.get('EsPlus', '').strip().lower() == 'si' 
                                 if pd.notna(ps_facility_val_sum) and ps_facility_val_sum != '':
                                      playstyles_from_facilities_sum.append(f"{ps_facility_val_sum}{'+' if is_plus_val_fac_sum else ''} (Inst.)")
                     
@@ -1605,7 +1613,7 @@ with tab_build_craft:
                     if total_playstyles_sum:
                         summary_text += "\n**PlayStyles Totales Desbloqueados:**\n"
                         for ps_name_sum_val_disp in total_playstyles_sum: 
-                            summary_text += f"  - {ps_name_val_disp}\n"
+                            summary_text += f"  - {ps_name_sum_val_disp}\n"
                     
                     # Almacenar el resumen en session_state para persistencia
                     st.session_state.build_summary_text = summary_text
@@ -1724,9 +1732,13 @@ with tab_build_craft:
             st.text_input("Nombre para este Build (opcional):", key="build_save_name_v33", value=st.session_state.get("build_save_name_v33",""))
 
             def prepare_build_data_to_save():
+                # Obtener el nombre del build del input, con fallback
+                build_name_input = st.session_state.get("build_save_name_v33", "").strip()
+                final_build_name = build_name_input if build_name_input else f"{st.session_state.bc_pos}_{st.session_state.bc_alt}cm_{st.session_state.bc_pes}kg"
+                
                 build_data = {
                     "app_version": f"{APP_VERSION}_build_data", 
-                    "build_name": st.session_state.get("build_save_name_v33", "Build Sin Nombre") or "Build Sin Nombre", # Asegurar que siempre haya un valor
+                    "build_name": final_build_name,  # Usar el nombre correcto
                     "base_profile": {
                         "posicion": st.session_state.bc_pos,
                         "altura": st.session_state.bc_alt,
@@ -1738,8 +1750,14 @@ with tab_build_craft:
                 }
                 return json.dumps(build_data, indent=2, ensure_ascii=False)
 
+            # Generar nombre de archivo mejorado
             build_name_for_file = st.session_state.get("build_save_name_v33", "").strip()
-            file_name_to_save = f"{build_name_for_file.replace(' ', '_')}_build_fc25.json" if build_name_for_file else "mi_build_fc25.json"
+            if build_name_for_file:
+                # Si hay nombre personalizado, usarlo + datos del perfil
+                file_name_to_save = f"{build_name_for_file.replace(' ', '_')}_{st.session_state.bc_pos}_{st.session_state.bc_alt}cm_{st.session_state.bc_pes}kg_build_fc25.json"
+            else:
+                # Si no hay nombre, usar solo los datos del perfil
+                file_name_to_save = f"{st.session_state.bc_pos}_{st.session_state.bc_alt}cm_{st.session_state.bc_pes}kg_build_fc25.json"
             
             st.download_button(
                 label="💾 Guardar Build Actual",
@@ -1756,7 +1774,7 @@ with tab_build_craft:
         # NUEVO: Selector de visualización
         tipo_visualizacion_bc = st.radio(
             "Tipo de visualización de árbol:",
-            ["Estilo EA FC25", "Lista de nodos", "Grafo interactivo"],
+            ["Estilo EA FC25", "Lista de nodos"],
             horizontal=True,
             key="tipo_visualizacion_arbol_bc"
         )
@@ -1878,9 +1896,7 @@ with tab_build_craft:
         if tipo_visualizacion_bc == "Estilo EA FC25":
             mostrar_visualizacion_fc25(df_skill_trees_global, arbol_sel_bc, st.session_state.bc_unlocked_nodes)
             st.divider()
-        elif tipo_visualizacion_bc == "Grafo interactivo":
-            mostrar_visualizacion_arbol(df_skill_trees_global, arbol_sel_bc, st.session_state.bc_unlocked_nodes)
-            st.divider()
+    
         # Si es "Lista de nodos", seguir con el código original de nodos:
         if tipo_visualizacion_bc == "Lista de nodos":
             nodos_a_mostrar_display = df_skill_trees_global  
@@ -1943,8 +1959,6 @@ with tab_build_craft:
                     col_idx_node_disp = 0  
                     
                     for nodo_item_disp in nodos_por_tier_display[tier_level_disp]:  
-                             
-                         
                         with node_cards_cols_disp[col_idx_node_disp % num_cols_display_nodes_disp]:
                             node_id_disp = nodo_item_disp['ID_Nodo'] 
                             is_unlocked_disp = node_id_disp in st.session_state.bc_unlocked_nodes  
@@ -2198,7 +2212,7 @@ with tab_best_combo:
                     st.session_state.bc_unlocked_nodes, st.session_state.bc_points_remaining = set(), TOTAL_SKILL_POINTS
                     st.session_state.unlocked_facility_levels = set()
                     st.session_state.club_budget_remaining = st.session_state.get('club_budget_total', DEFAULT_CLUB_BUDGET) 
-                    st.success("Perfil de Mejor Combinación Base enviado. Ve a '🛠️ Build Craft'.")
+                    st.success(f"Perfil de Mejor Combinación Base enviado. Ve a '🛠️ Build Craft'.")
                 
                 if 'AcceleRATE' not in best_player_combination_opt or pd.isna(best_player_combination_opt['AcceleRATE']):
                      accel_rate_best_optimal_opt = determinar_estilo_carrera(best_player_combination_opt['Altura'],best_player_combination_opt.get('AGI',0),best_player_combination_opt.get('STR',0),best_player_combination_opt.get('Acc',0)) 
@@ -2248,7 +2262,7 @@ with tab_best_combo:
             if attr_filter_opt in df_filtered_results_opt.columns:
                 df_filtered_results_opt[attr_filter_opt] = pd.to_numeric(df_filtered_results_opt[attr_filter_opt], errors='coerce').fillna(0)
                 
-                # Aplicar filtro según la condición
+                # Aplicar la condición
                 if cond_filter_opt == '>=':
                     df_filtered_results_opt = df_filtered_results_opt[df_filtered_results_opt[attr_filter_opt] >= val_filter_opt]
                 elif cond_filter_opt == '<=':
@@ -2263,7 +2277,7 @@ with tab_best_combo:
                     df_filtered_results_opt = df_filtered_results_opt[df_filtered_results_opt[attr_filter_opt] != val_filter_opt]
 
             if 'AcceleRATE' not in df_filtered_results_opt.columns:
-                df_filtered_results_opt['AcceleRATE'] = df_filtered_results_opt.apply(lambda r: determinar_estilo_carrera(r['Altura'], r.get('AGI',0),r.get('STR',0),r.get('Acc',0)), axis=1)
+                df_filtered_results_opt['AcceleRATE'] = df_filtered_results_opt.apply(lambda r: determinar_estilo_carrera(r['Altura'], r.get('AGI', 0), r.get('STR', 0), r.get('Acc', 0)), axis=1)
 
             # Ordenar por los atributos seleccionados si existen
             if 'sort_by_attributes_optimal_opt' in locals() and sort_by_attributes_optimal_opt:
@@ -2274,7 +2288,247 @@ with tab_best_combo:
                 st.dataframe(df_filtered_results_opt[['Posicion', 'Altura', 'Peso', 'AcceleRATE', 'IGS']])
             else:
                 st.info("No se encontraron combinaciones que cumplan con los criterios.")
-
+# --- Pestaña: Filtros Múltiples ---
+with tab_filters:
+    if not carga_completa_exitosa or all_stats_df_base.empty:
+        st.error("Datos para Filtros Múltiples no disponibles.")
+    else:
+        st.header("📊 Filtros Múltiples - Explorador de Perfiles")
+        st.markdown("""
+        **Encuentra todos los jugadores que cumplan con tus criterios específicos.**
+        
+        A diferencia de la "Búsqueda Óptima" que te da el mejor jugador, esta herramienta te muestra 
+        **todos los perfiles** que encajan dentro de tus requisitos mínimos.
+        """)
+        
+        # Inicializar filtros en session_state si no existen
+        if 'filter_criteria' not in st.session_state:
+            st.session_state.filter_criteria = []
+        
+        # Estadísticas disponibles para filtrar
+        filterable_stats = [col for col in stat_cols_order if col in all_stats_df_base.columns and col not in ['Posicion', 'Altura', 'Peso', 'AcceleRATE']]
+        
+        # --- SECCIÓN: CONSTRUCTOR DE FILTROS ---
+        st.subheader("🔧 Constructor de Filtros")
+        
+        # Botón para añadir nuevo criterio
+        if st.button("➕ Añadir Criterio de Filtro", key="add_filter_btn_v33"):
+            new_filter_id = st.session_state.get('next_filter_id', 0)
+            st.session_state.filter_criteria.append({
+                'id': new_filter_id,
+                'attribute': filterable_stats[0] if filterable_stats else 'IGS',
+                'condition': '>=',
+                'value': 70
+            })
+            st.session_state.next_filter_id = new_filter_id + 1
+            st.rerun()
+        
+        # Mostrar filtros existentes
+        if st.session_state.filter_criteria:
+            st.markdown("**Criterios Activos:**")
+            
+            # Crear columnas para los filtros
+            for i, filter_item in enumerate(st.session_state.filter_criteria):
+                cols_filter = st.columns([3, 2, 2, 1])
+                
+                with cols_filter[0]:
+                    # Selector de atributo
+                    current_attr_idx = filterable_stats.index(filter_item['attribute']) if filter_item['attribute'] in filterable_stats else 0
+                    new_attribute = st.selectbox(
+                        "Atributo:", 
+                        options=filterable_stats,
+                        index=current_attr_idx,
+                        key=f"filter_attr_{filter_item['id']}_v33"
+                    )
+                    st.session_state.filter_criteria[i]['attribute'] = new_attribute
+                
+                with cols_filter[1]:
+                    # Selector de condición
+                    condition_options = ['>=', '<=', '==', '>', '<', '!=']
+                    current_cond_idx = condition_options.index(filter_item['condition']) if filter_item['condition'] in condition_options else 0
+                    new_condition = st.selectbox(
+                        "Condición:",
+                        options=condition_options,
+                        index=current_cond_idx,
+                        key=f"filter_cond_{filter_item['id']}_v33"
+                    )
+                    st.session_state.filter_criteria[i]['condition'] = new_condition
+                
+                with cols_filter[2]:
+                    # Input de valor
+                    new_value = st.number_input(
+                        "Valor:",
+                        value=filter_item['value'],
+                        min_value=0,
+                        max_value=99,
+                        step=1,
+                        key=f"filter_val_{filter_item['id']}_v33"
+                    )
+                    st.session_state.filter_criteria[i]['value'] = new_value
+                
+                with cols_filter[3]:
+                    # Botón para eliminar este filtro
+                    if st.button("🗑️", key=f"remove_filter_{filter_item['id']}_v33", help="Eliminar este filtro"):
+                        st.session_state.filter_criteria.pop(i)
+                        st.rerun()
+            
+            # Mostrar resumen de filtros activos
+            st.markdown("**Resumen de Filtros:**")
+            filter_summary = []
+            for filter_item in st.session_state.filter_criteria:
+                filter_summary.append(f"**{filter_item['attribute']}** {filter_item['condition']} **{filter_item['value']}**")
+            st.markdown(" **Y** ".join(filter_summary))
+            
+        else:
+            st.info("No hay filtros activos. Haz clic en '➕ Añadir Criterio de Filtro' para comenzar.")
+        
+        # --- SECCIÓN: APLICAR FILTROS Y RESULTADOS ---
+        if st.session_state.filter_criteria:
+            col_apply, col_clear = st.columns(2)
+            
+            with col_apply:
+                if st.button("🔍 Aplicar Filtros", key="apply_filters_btn_v33", type="primary"):
+                    # Aplicar todos los filtros a los datos base
+                    df_filtered = all_stats_df_base.copy()
+                    
+                    # Añadir AcceleRATE si no existe
+                    if 'AcceleRATE' not in df_filtered.columns:
+                        df_filtered['AcceleRATE'] = df_filtered.apply(
+                            lambda r: determinar_estilo_carrera(r['Altura'], r.get('AGI', 0), r.get('STR', 0), r.get('Acc', 0)), 
+                            axis=1
+                        )
+                    
+                    # Aplicar cada filtro
+                    for filter_item in st.session_state.filter_criteria:
+                        attr = filter_item['attribute']
+                        condition = filter_item['condition']
+                        value = filter_item['value']
+                        
+                        if attr in df_filtered.columns:
+                            # Asegurar que la columna es numérica
+                            df_filtered[attr] = pd.to_numeric(df_filtered[attr], errors='coerce').fillna(0)
+                            
+                            # Aplicar la condición
+                            if condition == '>=':
+                                df_filtered = df_filtered[df_filtered[attr] >= value]
+                            elif condition == '<=':
+                                df_filtered = df_filtered[df_filtered[attr] <= value]
+                            elif condition == '==':
+                                df_filtered = df_filtered[df_filtered[attr] == value]
+                            elif condition == '>':
+                                df_filtered = df_filtered[df_filtered[attr] > value]
+                            elif condition == '<':
+                                df_filtered = df_filtered[df_filtered[attr] < value]
+                            elif condition == '!=':
+                                df_filtered = df_filtered[df_filtered[attr] != value]
+                    
+                    # Guardar resultados en session_state
+                    st.session_state.filtered_results = df_filtered
+                    
+                    # Mostrar resultados inmediatamente
+                    if not df_filtered.empty:
+                        st.success(f"✅ Se encontraron **{len(df_filtered)}** perfiles que cumplen todos los criterios.")
+                    else:
+                        st.warning("⚠️ No se encontraron perfiles que cumplan con todos los criterios. Prueba relajar algunos filtros.")
+            
+            with col_clear:
+                if st.button("🧹 Limpiar Todos los Filtros", key="clear_filters_btn_v33"):
+                    st.session_state.filter_criteria = []
+                    if 'filtered_results' in st.session_state:
+                        del st.session_state.filtered_results
+                    st.rerun()
+        
+        # --- SECCIÓN: MOSTRAR RESULTADOS ---
+        if 'filtered_results' in st.session_state and not st.session_state.filtered_results.empty:
+            st.divider()
+            st.subheader(f"🎯 Resultados Encontrados ({len(st.session_state.filtered_results)})")
+            
+            # Ordenar por IGS descendente por defecto
+            df_results = st.session_state.filtered_results.sort_values('IGS', ascending=False)
+            
+            # Selector de columnas a mostrar
+            available_columns = ['Posicion', 'Altura', 'Peso', 'AcceleRATE', 'IGS'] + filterable_stats
+            default_columns = ['Posicion', 'Altura', 'Peso', 'AcceleRATE', 'IGS'] + [f['attribute'] for f in st.session_state.filter_criteria]
+            
+            # Eliminar duplicados y mantener orden
+            columns_to_show = []
+            for col in default_columns:
+                if col in available_columns and col not in columns_to_show:
+                    columns_to_show.append(col)
+            
+            # Añadir columnas restantes importantes
+            for col in ['PAC', 'SHO', 'PAS', 'DRI', 'DEF', 'PHY']:
+                if col in available_columns and col not in columns_to_show:
+                    columns_to_show.append(col)
+            
+            # Mostrar tabla de resultados
+            st.dataframe(
+                df_results[columns_to_show].reset_index(drop=True),
+                use_container_width=True,
+                height=400
+            )
+            
+            # --- SECCIÓN: ENVIAR PERFILES A BUILD CRAFT ---
+            st.subheader("🛠️ Enviar a Build Craft")
+            
+            # Mostrar Top 5 para envío rápido
+            top_5_results = df_results.head(5)
+            st.markdown("**Top 5 por IGS (Envío Rápido):**")
+            
+            cols_top5 = st.columns(min(len(top_5_results), 5))
+            
+            for i, (idx, row) in enumerate(top_5_results.iterrows()):
+                with cols_top5[i]:
+                    with st.container(border=True):
+                        st.markdown(f"**#{i+1}**")
+                        st.markdown(f"**{row['Posicion']}** | {row['Altura']}cm | {row['Peso']}kg")
+                        st.caption(f"IGS: {int(row['IGS'])}")
+                        st.caption(f"AcceleRATE: {row['AcceleRATE']}")
+                        
+                        if st.button(
+                            "🛠️ Editar", 
+                            key=f"send_filtered_result_{idx}_v33",
+                            use_container_width=True
+                        ):
+                            # Enviar a Build Craft
+                            st.session_state.bc_pos = row['Posicion']
+                            st.session_state.bc_alt = row['Altura'] 
+                            st.session_state.bc_pes = row['Peso']
+                            st.session_state.bc_unlocked_nodes = set()
+                            st.session_state.bc_points_remaining = TOTAL_SKILL_POINTS
+                            st.session_state.unlocked_facility_levels = set()
+                            st.session_state.club_budget_remaining = st.session_state.get('club_budget_total', DEFAULT_CLUB_BUDGET)
+                            st.success(f"Perfil #{i+1} enviado a Build Craft. Ve a la pestaña '🛠️ Build Craft'.")
+            
+            # Estadísticas del conjunto de resultados
+            st.divider()
+            st.subheader("📊 Estadísticas del Conjunto")
+            
+            cols_stats = st.columns(4)
+            
+            with cols_stats[0]:
+                st.metric("Total de Perfiles", len(df_results))
+            
+            with cols_stats[1]:
+                igs_promedio = df_results['IGS'].mean()
+                st.metric("IGS Promedio", f"{igs_promedio:.1f}")
+            
+            with cols_stats[2]:
+                posiciones_unicas = df_results['Posicion'].nunique()
+                st.metric("Posiciones Diferentes", posiciones_unicas)
+            
+            with cols_stats[3]:
+                mejor_igs = df_results['IGS'].max()
+                st.metric("Mejor IGS", int(mejor_igs))
+            
+            # Distribución por posiciones
+            if len(df_results) > 0:
+                st.markdown("**Distribución por Posiciones:**")
+                pos_counts = df_results['Posicion'].value_counts()
+                st.bar_chart(pos_counts)
+        
+        elif 'filtered_results' in st.session_state and st.session_state.filtered_results.empty:
+            st.info("Los filtros aplicados no produjeron resultados. Intenta ajustar los criterios.")
 # NUEVA FUNCIONALIDAD: Exportación mejorada
 def generar_exportacion_avanzada():
     """

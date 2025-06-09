@@ -250,14 +250,7 @@ def show_hexagonal_skill_node(node, unlocked_nodes, tree_data, subtree_style=Non
         if 'PlayStyle' in node and pd.notna(node['PlayStyle']) and node['PlayStyle'] != '':
             st.caption(f"🎭 **{node['PlayStyle']}**")
         
-        # Beneficios del nodo (compacto)
-        benefits = get_node_benefits_compact(node)
-        if benefits:
-            st.caption(f"⚡ {benefits}")
-        
-        # PlayStyle si existe
-        if 'PlayStyle' in node and pd.notna(node['PlayStyle']) and node['PlayStyle'] != '':
-            st.caption(f"🎭 **{node['PlayStyle']}**")
+
 
 def get_node_benefits_compact(node):
     """
