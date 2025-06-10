@@ -6,6 +6,7 @@ import math
 import json
 from collections import defaultdict
 from visualizacion_fc25_style import mostrar_visualizacion_fc25  # NUEVO: importar visualización FC25
+import numpy as np
 
 
 # Definir emoji de estrella AL INICIO
@@ -277,16 +278,20 @@ def check_prerequisites_skills(node_id, df_skill_tree_data, unlocked_nodes_ids):
     if pd.isna(prereqs_from_df) or str(prereqs_from_df).strip() == "":
         return True 
 
+    # Lista de IDs de prerrequisitos, limpios de espacios
     prereq_ids_list = [pr_id.strip() for pr_id in str(prereqs_from_df).split(',') if pr_id.strip()]
     
     if not prereq_ids_list: 
         return True 
 
+    # Lógica OR: si CUALQUIER prerrequisito está desbloqueado, se puede desbloquear el nodo.
+    # Esto se alinea con la lógica en visualizacion_fc25_style.py (can_unlock_node)
     for pr_id in prereq_ids_list:
-        if pr_id not in unlocked_nodes_ids:
-            return False 
+        if pr_id in unlocked_nodes_ids:
+            return True # Se encontró un prerrequisito cumplido
             
-    return True
+    return False # Ninguno de los prerrequisitos está cumplido
+
 
 def verificar_dependencias_nodo(nodo_id_a_evaluar, df_all_skills, currently_unlocked_nodes):
     dependent_nodes_names = []
@@ -1386,6 +1391,29 @@ st.sidebar.markdown("---")
 st.session_state.apply_facility_boosts_toggle = st.sidebar.checkbox("Aplicar Boosts de Instalaciones del Club", 
                                                                     value=st.session_state.get('apply_facility_boosts_toggle', True), 
                                                                     key="facility_boost_toggle_v33") 
+# En la barra lateral, después de los selectores de perfil base, agregar:
+st.sidebar.markdown("---")
+st.sidebar.markdown("### 📊 Estado del Build:")
+
+puntos_usados_sidebar = TOTAL_SKILL_POINTS - st.session_state.bc_points_remaining
+progreso_puntos = (puntos_usados_sidebar / TOTAL_SKILL_POINTS) * 100
+
+st.sidebar.metric("Puntos Usados", f"{puntos_usados_sidebar}/{TOTAL_SKILL_POINTS}")
+st.sidebar.metric("Progreso Build", f"{progreso_puntos:.1f}%")
+
+# Barra de progreso visual
+st.sidebar.progress(progreso_puntos / 100)
+
+# Información adicional si hay instalaciones
+if st.session_state.unlocked_facility_levels:
+    costo_instalaciones_sidebar = 0
+    if df_instalaciones_global is not None:
+        for facility_id in st.session_state.unlocked_facility_levels:
+            facility_data = df_instalaciones_global[df_instalaciones_global['ID_Instalacion'] == facility_id]
+            if not facility_data.empty:
+                costo_instalaciones_sidebar += facility_data.iloc[0]['Precio']
+    
+    st.sidebar.metric("💰 Gastado en Instalaciones", f"${costo_instalaciones_sidebar:,}")
 
 # Definición de Pestañas
 tab_calc, tab_build_craft, tab_facilities, tab_explorer, tab_best_combo, tab_filters, tab_reverse = st.tabs([
@@ -1480,15 +1508,23 @@ with tab_calc:
             top_5_igs_calc_df = all_stats_df_base_display_top5_calc.sort_values(by='IGS', ascending=False).head(5)
             st.dataframe(top_5_igs_calc_df[['Posicion', 'Altura', 'Peso', 'AcceleRATE', 'IGS']])
             num_top_cols_stable_v33 = min(len(top_5_igs_calc_df), 5) 
-            cols_top5_buttons_stable_v33 = st.columns(num_top_cols_stable_v33) if num_top_cols_stable_v33 > 0 else [st] 
+            
+            # Crear columnas para los botones, asegurando que haya al menos una columna si hay datos.
+            cols_top5_buttons_stable_v34 = st.columns(num_top_cols_stable_v33) if num_top_cols_stable_v33 > 0 else []
+
             for i, row_idx in enumerate(top_5_igs_calc_df.index):
                 row = top_5_igs_calc_df.loc[row_idx]
-                with cols_top5_buttons_stable_v33[i % num_top_cols_stable_v33]:
-                    if st.button(f"🛠️ Editar {row['Posicion']} {row['Altura']}cm {row['Peso']}kg", key=f"send_to_bc_top5_{row_idx}_v33"): 
+                # Asegurarse de que el índice de columna sea válido
+                current_col_index = i % num_top_cols_stable_v33 if num_top_cols_stable_v33 > 0 else 0
+                
+                with cols_top5_buttons_stable_v34[current_col_index]:
+                    button_text = f"🛠️ Editar {row['Posicion']} {row['Altura']}cm {row['Peso']}kg (Top {i+1})"
+                    if st.button(button_text, key=f"send_to_bc_top5_{row_idx}_v34"): 
                         st.session_state.bc_pos, st.session_state.bc_alt, st.session_state.bc_pes = row['Posicion'], row['Altura'], row['Peso']
                         st.session_state.bc_unlocked_nodes, st.session_state.bc_points_remaining = set(), TOTAL_SKILL_POINTS
                         st.session_state.unlocked_facility_levels, st.session_state.club_budget_remaining = set(), st.session_state.get('club_budget_total', DEFAULT_CLUB_BUDGET)
-                        st.success(f"Perfil Top {i+1} enviado. Ve a '🛠️ Build Craft'.")
+                        st.success(f"Perfil Top {i+1} ({row['Posicion']}) enviado a 'Build Craft'. La página se actualizará.")
+                        st.rerun()
         else: st.warning("Datos para el Top 5 (base) no disponibles.")
     else: st.info("Define parámetros de al menos un jugador para ver stats base.")
 
@@ -1497,6 +1533,11 @@ with tab_build_craft:
     if not carga_completa_exitosa: 
         st.error("Faltan datos para el Build Craft.")
     else:
+        st.info(f"DEBUG (Build Craft): Pos={st.session_state.get('bc_pos')}, Alt={st.session_state.get('bc_alt')}, Pes={st.session_state.get('bc_pes')}")
+        jugador_base_actual_bc = calcular_stats_base_jugador(st.session_state.bc_pos, st.session_state.bc_alt, st.session_state.bc_pes, stats_base_lb_rb, modificadores_altura, modificadores_peso, diferenciales_posicion)
+        if jugador_base_actual_bc is None:
+            st.error("ERROR CRÍTICO (Build Craft): No se pudieron calcular las stats base para el perfil actual. Las stats se mostrarán en cero.")
+
         st.header(f"🛠️ Build Craft: {st.session_state.bc_pos} | {st.session_state.bc_alt}cm | {st.session_state.bc_pes}kg")
         jugador_base_actual_bc = calcular_stats_base_jugador(st.session_state.bc_pos, st.session_state.bc_alt, st.session_state.bc_pes, stats_base_lb_rb, modificadores_altura, modificadores_peso, diferenciales_posicion)
         stats_completas_bc = calcular_stats_completas( 
@@ -2649,7 +2690,6 @@ def calcular_diferencias(stats1, stats2):
         if stat in stats1:
             diferencias[stat] = stats1[stat] - stats2[stat]
     return diferencias
-
 # Nueva pestaña: "🔍 Detector de Build Inverso"
 def implementar_detector_build_inverso():
     st.header("🔍 Detector de Build Inverso")
@@ -2662,13 +2702,148 @@ def implementar_detector_build_inverso():
     # --- SECCIÓN 1: DATOS CONOCIDOS ---
     st.subheader("📋 Datos Conocidos (lo que ves en el juego)")
     
+    # --- SECCIÓN: CARGAR BUILD DETECTADO PREVIO ---
+    with st.expander("📤 Cargar Build Detectado Previo (JSON)", expanded=False):
+        st.markdown("""
+        **¿Tienes un build detectado previamente?** 
+        
+        Carga el archivo JSON para rellenar automáticamente los datos y refinar la detección.
+        """)
+        
+        # Verificar si venimos de una recarga después de cargar un archivo
+        if 'just_loaded_reverse_file' in st.session_state and st.session_state.just_loaded_reverse_file:
+            st.session_state.just_loaded_reverse_file = False
+            uploader_key_reverse = "reverse_build_file_uploader_cleared"
+        else:
+            uploader_key_reverse = "reverse_build_file_uploader_v33"
+        
+        uploaded_reverse_file = st.file_uploader(
+            "📤 Cargar Build Detectado (.json):", 
+            type=["json"], 
+            key=uploader_key_reverse,
+            help="Carga un archivo JSON de un build detectado previamente para refinarlo o modificarlo"
+        )
+        
+        if uploaded_reverse_file is not None:
+            try:
+                content_string_reverse = uploaded_reverse_file.read().decode()
+                data_reverse_cargada = json.loads(content_string_reverse)
+                
+                # Verificar si es un archivo de build detectado
+                is_detected_build = (
+                    'metodo_deteccion' in data_reverse_cargada and 
+                    data_reverse_cargada['metodo_deteccion'] == 'Detector_Reverso'
+                )
+                
+                # También aceptar builds normales
+                is_normal_build = (
+                    'base_profile' in data_reverse_cargada and
+                    'nodos_habilidad_desbloqueados' in data_reverse_cargada
+                )
+                
+                if is_detected_build or is_normal_build:
+                    # Extraer datos del perfil base
+                    if 'base_profile' in data_reverse_cargada:
+                        base_profile = data_reverse_cargada['base_profile']
+                        
+                        # Establecer posición y dimensiones
+                        if 'posicion' in base_profile:
+                            st.session_state.reverse_pos = base_profile['posicion']
+                        if 'altura' in base_profile:
+                            st.session_state.reverse_altura = base_profile['altura']
+                        
+                        # Si es un build detectado, puede tener el peso detectado
+                        if is_detected_build and 'peso' in base_profile:
+                            st.info(f"💡 Este build fue detectado con peso: **{base_profile['peso']}kg**")
+                    
+                    # Cargar nodos de habilidad
+                    if 'nodos_habilidad_desbloqueados' in data_reverse_cargada:
+                        nodos_cargados = data_reverse_cargada['nodos_habilidad_desbloqueados']
+                        
+                        if nodos_cargados and df_skill_trees_global is not None:
+                            # Limpiar selecciones anteriores
+                            arboles_disponibles = sorted(df_skill_trees_global['Arbol'].unique())
+                            for arbol in arboles_disponibles:
+                                st.session_state[f"reverse_nodes_{arbol}"] = []
+                            
+                            # Agrupar nodos por árbol y cargar
+                            nodos_por_arbol_cargados = {}
+                            for node_id in nodos_cargados:
+                                node_data = df_skill_trees_global[df_skill_trees_global['ID_Nodo'] == str(node_id)]
+                                if not node_data.empty:
+                                    node_info = node_data.iloc[0]
+                                    arbol_name = node_info['Arbol']
+                                    nombre_visible = node_info['Nombre_Visible']
+                                    
+                                    if arbol_name not in nodos_por_arbol_cargados:
+                                        nodos_por_arbol_cargados[arbol_name] = []
+                                    nodos_por_arbol_cargados[arbol_name].append(nombre_visible)
+                            
+                            # Establecer los nodos en session_state
+                            for arbol_name, nodos_nombres in nodos_por_arbol_cargados.items():
+                                st.session_state[f"reverse_nodes_{arbol_name}"] = nodos_nombres
+                    
+                    # Si es un build detectado, cargar datos de entrada originales
+                    if is_detected_build and 'datos_entrada_deteccion' in data_reverse_cargada:
+                        datos_entrada = data_reverse_cargada['datos_entrada_deteccion']
+                        
+                        # Cargar estadísticas principales si existen
+                        if 'stats_objetivo' in datos_entrada and datos_entrada['stats_objetivo']:
+                            for stat, value in datos_entrada['stats_objetivo'].items():
+                                if stat in ['PAC', 'SHO', 'PAS', 'DRI', 'DEF', 'PHY']:
+                                    st.session_state[f"reverse_stat_{stat}"] = value
+                            st.session_state.usar_stats_finales_reverse = True
+                        
+                        # Cargar sub-estadísticas si existen
+                        if 'substats_objetivo' in datos_entrada and datos_entrada['substats_objetivo']:
+                            for substat, value in datos_entrada['substats_objetivo'].items():
+                                if substat in IGS_SUB_STATS and value is not None:
+                                    st.session_state[f"reverse_substat_{substat}"] = value
+                            st.session_state.show_substats_reverse = True
+                    
+                    # Mostrar información de lo que se cargó
+                    loaded_build_name_reverse = data_reverse_cargada.get("build_name", "Build Sin Nombre")
+                    precision_info = ""
+                    
+                    if is_detected_build and 'precision_deteccion' in data_reverse_cargada:
+                        precision_info = f" (Precisión: {data_reverse_cargada['precision_deteccion']})"
+                    
+                    st.success(f"✅ Build cargado: **{loaded_build_name_reverse}**{precision_info}")
+                    
+                    # Mostrar resumen de lo cargado
+                    col_loaded_info1, col_loaded_info2 = st.columns(2)
+                    
+                    with col_loaded_info1:
+                        if 'base_profile' in data_reverse_cargada:
+                            profile = data_reverse_cargada['base_profile']
+                            st.info(f"📋 Perfil: {profile.get('posicion', 'N/A')} | {profile.get('altura', 'N/A')}cm")
+                    
+                    with col_loaded_info2:
+                        nodos_count = len(data_reverse_cargada.get('nodos_habilidad_desbloqueados', []))
+                        st.info(f"🌳 Nodos: {nodos_count} cargados")
+                    
+                    # Marcar flag para limpiar el uploader
+                    st.session_state.just_loaded_reverse_file = True
+                    
+                    st.info("🔄 La página se actualizará para mostrar los datos cargados.")
+                    st.rerun()
+                    
+                else:
+                    st.error("❌ El archivo no es un build detectado válido o un build normal. Verifica el formato.")
+                    
+            except json.JSONDecodeError:
+                st.error("❌ Error: El archivo no es un JSON válido.")
+            except Exception as e:
+                st.error(f"❌ Error al procesar el archivo: {e}")
+    
+    st.divider()    
     col1, col2 = st.columns(2)
     
     with col1:
         # Datos básicos
         reverse_pos = st.selectbox("Posición:", _sorted_lp_sb_init, key="reverse_pos")
         
-        # CORREGIDO: Altura con opciones disponibles
+        # Altura con opciones disponibles
         idx_altura_reverse = _unique_alts_sb_init.index(180) if 180 in _unique_alts_sb_init else 0
         reverse_altura = st.selectbox(
             "Altura (cm):", 
@@ -2677,16 +2852,53 @@ def implementar_detector_build_inverso():
             key="reverse_altura"
         )
         
-        # MEJORADO: Nodos conocidos organizados por árbol
+        # Nodos conocidos organizados por árbol
         st.markdown("**Nodos Desbloqueados (que puedes ver):**")
         reverse_nodes = []
-
+        
         if df_skill_trees_global is not None:
-            # Agrupar nodos por árbol para facilitar la selección
             arboles_disponibles = sorted(df_skill_trees_global['Arbol'].unique())
             
-            with st.expander("Seleccionar nodos por árbol"):
+            mostrar_selector_nodos = st.checkbox("📋 Mostrar selector de nodos por árbol", key="show_node_selector")
+            
+            if mostrar_selector_nodos:
+                # Pre-crear el mapeo de nombres a IDs para evitar búsquedas repetidas
+                mapeo_nombres_ids = {}
                 for arbol in arboles_disponibles:
+                    nodos_del_arbol = df_skill_trees_global[df_skill_trees_global['Arbol'] == arbol]
+                    for _, nodo in nodos_del_arbol.iterrows():
+                        nombre_visible = nodo['Nombre_Visible']
+                        id_nodo = nodo['ID_Nodo']
+                        mapeo_nombres_ids[nombre_visible] = id_nodo
+                
+                # Botón global para limpiar
+                if st.button("🧹 Limpiar TODOS los árboles", key="clear_all_trees_reverse"):
+                    for arbol in arboles_disponibles:
+                        st.session_state[f"reverse_nodes_{arbol}"] = []
+                
+                st.markdown("---")
+                
+                # Procesar árbol por árbol sin columnas anidadas
+                for arbol in arboles_disponibles:
+                    st.markdown(f"### 🌳 **{arbol}**")
+                    
+                    # Botones de acción del árbol en una sola fila
+                    col_btn1, col_btn2, col_spacer = st.columns([1, 1, 2])
+                    
+                    with col_btn1:
+                        if st.button("✅ Todo", key=f"select_all_{arbol}_reverse", help=f"Seleccionar todos los nodos de {arbol}"):
+                            nodos_del_arbol = df_skill_trees_global[df_skill_trees_global['Arbol'] == arbol]
+                            opciones_nodos = []
+                            for _, nodo in nodos_del_arbol.iterrows():
+                                nombre_visible = nodo['Nombre_Visible']
+                                opciones_nodos.append(nombre_visible)
+                            st.session_state[f"reverse_nodes_{arbol}"] = opciones_nodos
+                    
+                    with col_btn2:
+                        if st.button("❌ Limpiar", key=f"clear_all_{arbol}_reverse", help=f"Limpiar todos los nodos de {arbol}"):
+                            st.session_state[f"reverse_nodes_{arbol}"] = []
+                    
+                    # Obtener nodos del árbol
                     nodos_del_arbol = df_skill_trees_global[df_skill_trees_global['Arbol'] == arbol]
                     
                     # Crear opciones con nombre visible + ID
@@ -2696,73 +2908,181 @@ def implementar_detector_build_inverso():
                         id_nodo = nodo['ID_Nodo']
                         opciones_nodos.append((f"{nombre_visible}", id_nodo))
                     
+                    # Multiselect con contador
+                    current_selection = st.session_state.get(f"reverse_nodes_{arbol}", [])
                     nodos_seleccionados = st.multiselect(
-                        f"{arbol}:",
+                        f"Nodos de {arbol} ({len(current_selection)}/{len(opciones_nodos)} seleccionados):",
                         options=[opcion[0] for opcion in opciones_nodos],
+                        default=current_selection,
                         key=f"reverse_nodes_{arbol}",
-                        help=f"Nodos desbloqueados en {arbol}"
+                        help=f"Nodos desbloqueados en {arbol}. Usa los botones '✅ Todo' o '❌ Limpiar' para selección masiva del árbol."
                     )
                     
-                    # Extraer los IDs de los nodos seleccionados
+                    # CORREGIDO: Extraer los IDs de los nodos seleccionados SOLO UNA VEZ
                     for nombre_seleccionado in nodos_seleccionados:
-                        for opcion in opciones_nodos:
-                            if opcion[0] == nombre_seleccionado:
-                                reverse_nodes.append(opcion[1])
-                                break
-            
-            # Mostrar resumen de nodos seleccionados
-            if reverse_nodes:
-                st.success(f"✅ {len(reverse_nodes)} nodos seleccionados")
+                        if nombre_seleccionado in mapeo_nombres_ids:
+                            reverse_nodes.append(mapeo_nombres_ids[nombre_seleccionado])
+                    
+                    # Mostrar información del árbol si hay nodos seleccionados
+                    if nodos_seleccionados:
+                        costo_arbol = 0
+                        for nombre_sel in nodos_seleccionados:
+                            if nombre_sel in mapeo_nombres_ids:
+                                node_id = mapeo_nombres_ids[nombre_sel]
+                                node_data = df_skill_trees_global[df_skill_trees_global['ID_Nodo'] == node_id]
+                                if not node_data.empty:
+                                    costo_arbol += node_data.iloc[0]['Costo']
+                        
+                        # Mostrar información con colores
+                        if costo_arbol <= 40:
+                            st.success(f"🎯 Árbol {arbol}: {len(nodos_seleccionados)} nodos | {costo_arbol} puntos")
+                        elif costo_arbol <= 80:
+                            st.warning(f"🎯 Árbol {arbol}: {len(nodos_seleccionados)} nodos | {costo_arbol} puntos")
+                        else:
+                            st.error(f"🎯 Árbol {arbol}: {len(nodos_seleccionados)} nodos | {costo_arbol} puntos (¡Muy alto!)")
+                    
+                    st.markdown("---")
+                
+                # Mostrar resumen general de puntos
+                if reverse_nodes:
+                    puntos_totales_nodos = 0
+                    if df_skill_trees_global is not None:
+                        for node_id in reverse_nodes:
+                            node_data = df_skill_trees_global[df_skill_trees_global['ID_Nodo'] == node_id]
+                            if not node_data.empty:
+                                puntos_totales_nodos += node_data.iloc[0]['Costo']
+                    
+                    col_resumen1, col_resumen2 = st.columns(2)
+                    
+                    with col_resumen1:
+                        st.success(f"✅ {len(reverse_nodes)} nodos seleccionados")
+                    
+                    with col_resumen2:
+                        progreso_nodos = (puntos_totales_nodos / TOTAL_SKILL_POINTS) * 100
+                        st.metric(
+                            "Puntos de Nodos", 
+                            f"{puntos_totales_nodos}/{TOTAL_SKILL_POINTS}",
+                            help=f"Progreso: {progreso_nodos:.1f}% del total disponible"
+                        )
+                    
+                    st.progress(progreso_nodos / 100, text=f"Uso de puntos: {progreso_nodos:.1f}%")
+            else:
+                st.info("Activa el selector para elegir nodos por árbol.")
     
     with col2:
-        # Estadísticas finales visibles
-        st.markdown("**Estadísticas Finales (que ves en el juego):**")
+        # Estadísticas finales opcionales
+        usar_stats_finales = st.checkbox(
+            "Usar estadísticas finales (PAC, SHO, etc.)", 
+            value=True,
+            key="usar_stats_finales_reverse",
+            help="Desmarca si las stats principales del juego están buggeadas o no son confiables"
+        )
         
         reverse_stats = {}
-        for stat in ['PAC', 'SHO', 'PAS', 'DRI', 'DEF', 'PHY']:
-            reverse_stats[stat] = st.number_input(
-                f"{stat}:", 
-                min_value=1, 
-                max_value=99, 
-                value=75, 
-                key=f"reverse_stat_{stat}"
-            )
+        if usar_stats_finales:
+            st.markdown("**Estadísticas Finales (que ves en el juego):**")
+            for stat in ['PAC', 'SHO', 'PAS', 'DRI', 'DEF', 'PHY']:
+                reverse_stats[stat] = st.number_input(
+                    f"{stat}:", 
+                    min_value=1, 
+                    max_value=99, 
+                    value=75, 
+                    key=f"reverse_stat_{stat}"
+                )
+        else:
+            st.info("📊 Stats principales deshabilitadas. Solo se usarán sub-estadísticas.")
         
-        # MEJORADO: Sub-estadísticas organizadas por categoría
-        with st.expander("Sub-estadísticas (opcional - para mayor precisión)"):
-            reverse_substats = {}
-            
-            # Organizar por categorías principales
+        # Sub-estadísticas organizadas por categoría
+        mostrar_substats = st.checkbox(
+            "📈 Usar sub-estadísticas (mayor precisión)", 
+            key="show_substats_reverse",
+            help="Activa para ingresar sub-estadísticas específicas para mayor precisión"
+        )
+        
+        reverse_substats = {}
+        if mostrar_substats:
+            st.markdown("**Sub-estadísticas (opcional - para mayor precisión):**")
             for main_cat, sub_stats_list in SUB_STATS_MAPPING.items():
                 st.markdown(f"**{main_cat}:**")
-                cols_substats = st.columns(min(len(sub_stats_list), 4))
                 
                 for idx, substat in enumerate(sub_stats_list):
-                    with cols_substats[idx % len(cols_substats)]:
-                        reverse_substats[substat] = st.number_input(
-                            f"{substat}:", 
-                            min_value=0, 
-                            max_value=99, 
-                            value=None, 
-                            key=f"reverse_substat_{substat}",
-                            help=f"Sub-estadística de {main_cat}"
-                        )
+                    reverse_substats[substat] = st.number_input(
+                        f"{substat}:", 
+                        min_value=0, 
+                        max_value=99, 
+                        value=None, 
+                        key=f"reverse_substat_{substat}",
+                        help=f"Sub-estadística de {main_cat}"
+                    )
     
     # --- SECCIÓN 2: DETECCIÓN ---
+    st.divider()
+    
+    # Validación
+    tiene_datos_suficientes = reverse_nodes and (reverse_stats or any(v is not None for v in reverse_substats.values()))
+    
     if st.button("🔍 Detectar Peso e Instalaciones", key="detect_reverse_build", type="primary"):
-        if reverse_nodes and reverse_stats:
+        if tiene_datos_suficientes:
             with st.spinner("Analizando todas las combinaciones posibles..."):
                 resultados = detectar_build_reverso(
                     reverse_pos, 
                     reverse_altura, 
-                    reverse_stats, 
+                    reverse_stats if usar_stats_finales else {}, 
                     reverse_nodes, 
                     reverse_substats
                 )
                 
-                mostrar_resultados_deteccion(resultados)
+                mostrar_resultados_deteccion(resultados, reverse_pos, reverse_altura, reverse_nodes, reverse_stats, reverse_substats)
         else:
-            st.error("Por favor completa al menos la posición, altura, estadísticas principales y algunos nodos.")
+            st.error("Por favor completa al menos la posición, altura, algunos nodos Y (estadísticas principales O sub-estadísticas).")
+def calcular_boosts_nodos(nodos_ids):
+    """Calcula los boosts totales de una lista de nodos"""
+    boosts = defaultdict(int)
+    
+    if df_skill_trees_global is not None:
+        for node_id in nodos_ids:
+            node_data = df_skill_trees_global[df_skill_trees_global['ID_Nodo'] == node_id]
+            if not node_data.empty:
+                node_info = node_data.iloc[0]
+                for stat_col in ALL_POSSIBLE_STAT_BOOST_COLS_SKILL_TREE:
+                    if stat_col in node_info.index and pd.notna(node_info[stat_col]) and node_info[stat_col] != 0:
+                        if stat_col in IGS_SUB_STATS:  # Solo sub-stats
+                            boosts[stat_col] += int(node_info[stat_col])
+    
+    return dict(boosts)
+
+def calcular_boosts_instalaciones(instalaciones_ids):
+    """Calcula los boosts totales de una lista de instalaciones"""
+    boosts = defaultdict(int)
+    
+    if df_instalaciones_global is not None:
+        for facility_id in instalaciones_ids:
+            facility_data = df_instalaciones_global[df_instalaciones_global['ID_Instalacion'] == facility_id]
+            if not facility_data.empty:
+                facility_info = facility_data.iloc[0]
+                for stat_col in ALL_POSSIBLE_STAT_BOOST_COLS_FACILITIES:
+                    if stat_col in facility_info.index and pd.notna(facility_info[stat_col]) and facility_info[stat_col] != 0:
+                        boosts[stat_col] += int(facility_info[stat_col])
+    
+    return dict(boosts)
+
+def hacer_json_serializable(obj):
+    """Convierte objetos NumPy/Pandas a tipos nativos de Python para JSON"""
+    
+    if isinstance(obj, dict):
+        return {key: hacer_json_serializable(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [hacer_json_serializable(item) for item in obj]
+    elif isinstance(obj, (np.integer, np.int64, np.int32)):
+        return int(obj)
+    elif isinstance(obj, (np.floating, np.float64, np.float32)):
+        return float(obj)
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    elif hasattr(obj, 'item'):  # Para otros tipos de NumPy
+        return obj.item()
+    else:
+        return obj
 
 def detectar_build_reverso(posicion, altura, stats_objetivo, nodos_conocidos, substats_objetivo=None):
     """
@@ -2771,7 +3091,8 @@ def detectar_build_reverso(posicion, altura, stats_objetivo, nodos_conocidos, su
     candidatos = []
     
     # Probar todos los pesos posibles
-    for peso in range(60, 101):  # 60-100kg        # Obtener stats base para esta combinación
+    for peso in range(60, 101):  # 60-100kg
+        # Obtener stats base para esta combinación
         stats_base = calcular_stats_base_jugador(posicion, altura, peso, stats_base_lb_rb, modificadores_altura, modificadores_peso, diferenciales_posicion)
         if stats_base is None:
             continue
@@ -2849,9 +3170,9 @@ def calcular_precision_match(stats_calculadas, stats_objetivo, substats_objetivo
     precision = max(0, 1 - (total_diferencias / (total_stats * 10)))  # Normalizar
     return precision
 
-def mostrar_resultados_deteccion(resultados):
+def mostrar_resultados_deteccion(resultados, reverse_pos, reverse_altura, reverse_nodes, reverse_stats, reverse_substats):
     """
-    Muestra los resultados de la detección de build inverso
+    Muestra los resultados de la detección de build inverso con funcionalidad mejorada
     """
     if not resultados:
         st.error("❌ No se encontraron coincidencias. Verifica los datos ingresados.")
@@ -2888,25 +3209,106 @@ def mostrar_resultados_deteccion(resultados):
                     else:
                         st.error(f"{stat}: ±{diff}")
             
-            # Botón para enviar a Build Craft
-            if st.button(f"🛠️ Recrear en Build Craft", key=f"recreate_build_{i}"):
-                # Establecer la configuración detectada
-                st.session_state.bc_pos = st.session_state.reverse_pos
-                st.session_state.bc_alt = st.session_state.reverse_altura
-                st.session_state.bc_pes = candidato['peso']
-                st.session_state.bc_unlocked_nodes = set(st.session_state.reverse_nodes)
-                st.session_state.unlocked_facility_levels = set(candidato['instalaciones'])
+            # Botones en columnas
+            col_recrear, col_descargar = st.columns(2)
+            
+            with col_recrear:
+                # NUEVA LÓGICA: Generar JSON y simular carga automática
+                build_para_buildcraft = {
+                    "app_version": f"{APP_VERSION}_build_data",
+                    "build_name": f"Build_Detectado_{reverse_pos}_{reverse_altura}cm_{candidato['peso']}kg",
+                    "base_profile": {
+                        "posicion": str(reverse_pos),
+                        "altura": int(reverse_altura),
+                        "peso": int(candidato['peso'])
+                    },
+                    "nodos_habilidad_desbloqueados": [str(node) for node in reverse_nodes],
+                    "instalaciones_desbloqueadas": [str(inst) for inst in candidato['instalaciones']],
+                    "aplicar_boost_instalaciones": True
+                }
                 
-                # Recalcular puntos restantes
-                costo_total = sum([
-                    df_skill_trees_global[df_skill_trees_global['ID_Nodo'] == node]['Costo'].iloc[0] 
-                    for node in st.session_state.reverse_nodes 
-                    if not df_skill_trees_global[df_skill_trees_global['ID_Nodo'] == node].empty
-                ])
-                st.session_state.bc_points_remaining = TOTAL_SKILL_POINTS - costo_total
+                if st.button(f"🛠️ Recrear en Build Craft", key=f"recreate_build_{i}_{reverse_pos}_{reverse_altura}_{candidato['peso']}"):
+                    try:
+                        # Convertir a JSON serializable
+                        build_serializable = hacer_json_serializable(build_para_buildcraft)
+                        
+                        # CLAVE: Guardar el JSON en session_state para que Build Craft lo detecte
+                        st.session_state.build_data_to_load = build_serializable
+                        st.session_state.auto_load_build = True
+                        
+                        # Mostrar mensaje de éxito
+                        st.success("✅ Build preparado para cargar en Build Craft!")
+                        st.info("🔄 Ve a la pestaña '🛠️ Build Craft' - el build se cargará automáticamente.")
+                        
+                        # Mostrar resumen de lo que se va a cargar
+                        with st.container(border=True):
+                            st.markdown("**📋 Resumen del Build a Cargar:**")
+                            col_summary1, col_summary2 = st.columns(2)
+                            
+                            with col_summary1:
+                                st.write(f"**Posición:** {reverse_pos}")
+                                st.write(f"**Altura:** {reverse_altura}cm")
+                                st.write(f"**Peso:** {candidato['peso']}kg")
+                                st.write(f"**Precisión:** {candidato['precision']:.1%}")
+                            
+                            with col_summary2:
+                                st.write(f"**Nodos:** {len(reverse_nodes)} seleccionados")
+                                st.write(f"**Instalaciones:** {len(candidato['instalaciones'])} activas")
+                                st.write(f"**Boost Instalaciones:** ✅ Activado")
+                        
+                    except Exception as e:
+                        st.error(f"❌ Error al preparar el build:")
+                        st.error(f"Detalles: {str(e)}")
+                        
+                        # Mostrar datos para copia manual
+                        st.info("💡 **Datos para copia manual:**")
+                        st.code(f"""
+Posición: {reverse_pos}
+Altura: {reverse_altura}cm
+Peso: {candidato['peso']}kg
+Nodos: {len(reverse_nodes)} seleccionados
+Instalaciones: {len(candidato['instalaciones'])} activas
+                        """)
+            
+            with col_descargar:
+                # Código de descarga (sin cambios - funciona bien)
+                build_detectado = {
+                    "app_version": f"{APP_VERSION}_build_detectado",
+                    "build_name": f"Build_Detectado_{reverse_pos}_{reverse_altura}cm_{candidato['peso']}kg",
+                    "metodo_deteccion": "Detector_Reverso",
+                    "precision_deteccion": f"{candidato['precision']:.1%}",
+                    "base_profile": {
+                        "posicion": str(reverse_pos),
+                        "altura": int(reverse_altura),
+                        "peso": int(candidato['peso'])
+                    },
+                    "nodos_habilidad_desbloqueados": [str(node) for node in reverse_nodes],
+                    "instalaciones_desbloqueadas": [str(inst) for inst in candidato['instalaciones']],
+                    "aplicar_boost_instalaciones": True,
+                    "datos_entrada_deteccion": {
+                        "stats_objetivo": reverse_stats if reverse_stats else None,
+                        "substats_objetivo": {k: v for k, v in reverse_substats.items() if v is not None} if reverse_substats else None
+                    },
+                    "diferencias_calculadas": {str(k): int(v) for k, v in candidato['diferencias'].items()}
+                }
                 
-                st.success("✅ Build recreado en Build Craft. Ve a la pestaña '🛠️ Build Craft'.")
-
+                try:
+                    build_detectado_serializable = hacer_json_serializable(build_detectado)
+                    build_json = json.dumps(build_detectado_serializable, indent=2, ensure_ascii=False)
+                    
+                    file_name = f"Build_Detectado_{reverse_pos}_{reverse_altura}cm_{candidato['peso']}kg_FC25.json"
+                    
+                    st.download_button(
+                        label="💾 Descargar",
+                        data=build_json,
+                        file_name=file_name,
+                        mime="application/json",
+                        key=f"download_detected_{i}_{reverse_pos}_{reverse_altura}_{candidato['peso']}",
+                        help="Descarga el build detectado como archivo JSON",
+                        use_container_width=True
+                    )
+                except Exception as e:
+                    st.error(f"Error al generar descarga: {e}")
 def obtener_instalaciones_comunes():
     """
     Obtiene las instalaciones más comúnmente usadas para probar
@@ -2929,4 +3331,7 @@ def obtener_instalaciones_comunes():
 
 # --- Pestaña: Detector Reverso ---
 with tab_reverse:
-    implementar_detector_build_inverso()
+    if not carga_completa_exitosa:
+        st.error("Datos necesarios para el Detector Reverso no disponibles.")
+    else:
+        implementar_detector_build_inverso()
