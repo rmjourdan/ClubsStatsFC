@@ -2,33 +2,14 @@
   "version": 2,
   "builds": [
     {
-      "src": "api/main.py",
-      "use": "@vercel/python",
-      "config": {
-        "runtime": "python3.11",
-        "maxLambdaSize": "50mb"
-      }
+      "src": "analizador_fc.py",
+      "use": "@vercel/python"
     }
   ],
   "routes": [
     {
-      "src": "/api/(.*)",
-      "dest": "/api/main.py"
-    },
-    {
       "src": "/(.*)",
-      "dest": "/static/index.html"
+      "dest": "analizador_fc.py"
     }
-  ],
-  "env": {
-    "PYTHONPATH": "/var/task",
-    "SUPABASE_URL": "https://wrsgrjirilynudxhiqmj.supabase.co",
-    "SUPABASE_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indyc2dyamlyaWx5bnVkeGhpcW1qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDkzOTQ3NjEsImV4cCI6MjA2NDk3MDc2MX0.tb44znUoKu_zpUTLLDNEn-RhDl3bhvQZGAqYlbjnlKU"
-  },
-  "functions": {
-    "api/main.py": {
-      "memory": 1024,
-      "maxDuration": 30
-    }
-  }
+  ]
 }
