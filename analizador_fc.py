@@ -1418,7 +1418,7 @@ if st.session_state.unlocked_facility_levels:
 # Definición de Pestañas
 tab_calc, tab_build_craft, tab_facilities, tab_explorer, tab_best_combo, tab_filters, tab_reverse = st.tabs([
     "🧮 Calculadora", "🛠️ Build Craft", "🏨 Instalaciones Club", 
-    "🔎 Explorador Mejoras", "🔍 Búsqueda Óptima", "📊 Filtros Múltiples", "🔍 Detector Reverso"
+    "🔎 Explorador Mejoras", "🔍 Búsqueda Óptima", "📊 Filtros Múltiples", "🕵️‍♂️ Detective de Builds"
 ])
 
 # --- Pestaña: Calculadora y Comparador ---
@@ -1499,36 +1499,80 @@ with tab_calc:
             if 'AcceleRATE' in display_series_calc_single.index: display_series_calc_single['AcceleRATE'] = str(display_series_calc_single['AcceleRATE'])
             st.dataframe(display_series_calc_single.rename("Valor").astype(str))
         
-        st.divider(); st.header("🏆 Top 5 Combinaciones por IGS (Stats Base)")
-        if all_stats_df_base is not None and not all_stats_df_base.empty and 'IGS' in all_stats_df_base.columns:
-            all_stats_df_base_display_top5_calc = all_stats_df_base.copy()
-            all_stats_df_base_display_top5_calc['IGS'] = pd.to_numeric(all_stats_df_base_display_top5_calc['IGS'], errors='coerce').fillna(0)
-            if 'AcceleRATE' not in all_stats_df_base_display_top5_calc.columns:
-                 all_stats_df_base_display_top5_calc['AcceleRATE'] = all_stats_df_base_display_top5_calc.apply(lambda r: determinar_estilo_carrera(r['Altura'], r.get('AGI', 0), r.get('STR', 0), r.get('Acc', 0)), axis=1)
-            top_5_igs_calc_df = all_stats_df_base_display_top5_calc.sort_values(by='IGS', ascending=False).head(5)
-            st.dataframe(top_5_igs_calc_df[['Posicion', 'Altura', 'Peso', 'AcceleRATE', 'IGS']])
-            num_top_cols_stable_v33 = min(len(top_5_igs_calc_df), 5) 
+    st.divider(); st.header("🏆 Top 5 Combinaciones por IGS (Stats Base)")
+    if all_stats_df_base is not None and not all_stats_df_base.empty and 'IGS' in all_stats_df_base.columns:
+        # Preparar datos del Top 5
+        all_stats_df_base_display_top5_calc = all_stats_df_base.copy()
+        all_stats_df_base_display_top5_calc['IGS'] = pd.to_numeric(all_stats_df_base_display_top5_calc['IGS'], errors='coerce').fillna(0)
+        
+        # Añadir AcceleRATE si no existe
+        if 'AcceleRATE' not in all_stats_df_base_display_top5_calc.columns:
+            all_stats_df_base_display_top5_calc['AcceleRATE'] = all_stats_df_base_display_top5_calc.apply(
+                lambda r: determinar_estilo_carrera(r['Altura'], r.get('AGI', 0), r.get('STR', 0), r.get('Acc', 0)), 
+                axis=1
+            )
+        
+        # Obtener Top 5
+        top_5_igs_calc_df = all_stats_df_base_display_top5_calc.sort_values(by='IGS', ascending=False).head(5)
+        
+        # Mostrar tabla del Top 5
+        st.dataframe(
+            top_5_igs_calc_df[['Posicion', 'Altura', 'Peso', 'AcceleRATE', 'IGS']],
+            use_container_width=True
+        )
+        
+        # SECCIÓN DE BOTONES PARA ENVIAR A BUILD CRAFT
+        st.markdown("**🛠️ Enviar Perfiles a Build Craft:**")
+        
+        # Crear columnas para los botones (máximo 5 columnas)
+        num_top_cols_stable_v34 = min(len(top_5_igs_calc_df), 5)
+        if num_top_cols_stable_v34 > 0:
+            cols_top5_buttons_stable_v34 = st.columns(num_top_cols_stable_v34)
             
-            # Crear columnas para los botones, asegurando que haya al menos una columna si hay datos.
-            cols_top5_buttons_stable_v34 = st.columns(num_top_cols_stable_v33) if num_top_cols_stable_v33 > 0 else []
-
+            # Crear un botón por cada perfil del Top 5
             for i, row_idx in enumerate(top_5_igs_calc_df.index):
                 row = top_5_igs_calc_df.loc[row_idx]
-                # Asegurarse de que el índice de columna sea válido
-                current_col_index = i % num_top_cols_stable_v33 if num_top_cols_stable_v33 > 0 else 0
                 
-                with cols_top5_buttons_stable_v34[current_col_index]:
-                    button_text = f"🛠️ Editar {row['Posicion']} {row['Altura']}cm {row['Peso']}kg (Top {i+1})"
-                    if st.button(button_text, key=f"send_to_bc_top5_{row_idx}_v34"): 
-                        st.session_state.bc_pos, st.session_state.bc_alt, st.session_state.bc_pes = row['Posicion'], row['Altura'], row['Peso']
-                        st.session_state.bc_unlocked_nodes, st.session_state.bc_points_remaining = set(), TOTAL_SKILL_POINTS
-                        st.session_state.unlocked_facility_levels, st.session_state.club_budget_remaining = set(), st.session_state.get('club_budget_total', DEFAULT_CLUB_BUDGET)
-                        st.success(f"Perfil Top {i+1} ({row['Posicion']}) enviado a 'Build Craft'. La página se actualizará.")
-                        st.rerun()
-        else: st.warning("Datos para el Top 5 (base) no disponibles.")
-    else: st.info("Define parámetros de al menos un jugador para ver stats base.")
-
-# --- Pestaña: Build Craft ---
+                with cols_top5_buttons_stable_v34[i % num_top_cols_stable_v34]:
+                    # Crear contenedor con información del perfil
+                    with st.container(border=True):
+                        st.markdown(f"**Top #{i+1}**")
+                        st.markdown(f"**{row['Posicion']}** | {row['Altura']}cm | {row['Peso']}kg")
+                        st.caption(f"IGS: {int(row['IGS'])}")
+                        st.caption(f"AcceleRATE: {row['AcceleRATE']}")
+                        
+                        # Botón para enviar a Build Craft
+                        if st.button(
+                            f"🛠️ Editar", 
+                            key=f"send_to_bc_top5_{row_idx}_v34",
+                            help=f"Enviar {row['Posicion']} {row['Altura']}cm {row['Peso']}kg a Build Craft",
+                            use_container_width=True
+                        ):
+                            # ACCIÓN: Actualizar el perfil base del Build Craft
+                            st.session_state.bc_pos = row['Posicion']
+                            st.session_state.bc_alt = row['Altura'] 
+                            st.session_state.bc_pes = row['Peso']
+                            
+                            # ACCIÓN: Resetear el progreso del build del jugador
+                            st.session_state.bc_unlocked_nodes = set()
+                            st.session_state.bc_points_remaining = TOTAL_SKILL_POINTS
+                            
+                            # ACCIÓN: Resetear las instalaciones del club seleccionadas
+                            st.session_state.unlocked_facility_levels = set()
+                            st.session_state.club_budget_remaining = st.session_state.get('club_budget_total', DEFAULT_CLUB_BUDGET)
+                            
+                            # ACCIÓN: Informar al usuario
+                            st.success(f"✅ Perfil Top #{i+1} ({row['Posicion']} {row['Altura']}cm {row['Peso']}kg) enviado a Build Craft!")
+                            st.info("🔄 Ve a la pestaña '🛠️ Build Craft' para personalizar este perfil.")
+                            
+                            # ACCIÓN: Forzar actualización (opcional pero recomendado)
+                            st.rerun()
+        else:
+            st.warning("No hay perfiles suficientes para mostrar el Top 5.")
+            
+    else: 
+        st.warning("Datos para el Top 5 (base) no disponibles.")
+    # --- Pestaña: Build Craft ---
 with tab_build_craft:
     if not carga_completa_exitosa: 
         st.error("Faltan datos para el Build Craft.")
@@ -2683,32 +2727,95 @@ def combinar_boosts(boosts1, boosts2):
     
     return dict(combined)
 
-def calcular_diferencias(stats1, stats2):
-    """Calcula las diferencias entre dos sets de estadísticas"""
+def calcular_diferencias(stats_calculadas, stats_objetivo, substats_objetivo=None):
+    """Calcula las diferencias entre estadísticas calculadas y objetivo"""
     diferencias = {}
-    for stat in stats2:
-        if stat in stats1:
-            diferencias[stat] = stats1[stat] - stats2[stat]
+    
+    # Estadísticas principales
+    for stat, valor_objetivo in stats_objetivo.items():
+        if stat in stats_calculadas:
+            diferencias[stat] = stats_calculadas[stat] - valor_objetivo
+    
+    # Sub-estadísticas
+    if substats_objetivo:
+        for stat, valor_objetivo in substats_objetivo.items():
+            if valor_objetivo is not None and stat in stats_calculadas:
+                diferencias[stat] = stats_calculadas[stat] - valor_objetivo
+    
     return diferencias
-# Nueva pestaña: "🔍 Detector de Build Inverso"
+# Nueva pestaña: "🔍 Detective De Builds"
 def implementar_detector_build_inverso():
-    st.header("🔍 Detector de Build Inverso")
-    st.markdown("""
-    **¿Viste un build en el juego y quieres saber el peso exacto y las instalaciones?**
-    
-    Ingresa los datos que puedes ver y nosotros calcularemos lo que falta.
-    """)
-    
-    # --- SECCIÓN 1: DATOS CONOCIDOS ---
-    st.subheader("📋 Datos Conocidos (lo que ves en el juego)")
-    
-    # --- SECCIÓN: CARGAR BUILD DETECTADO PREVIO ---
-    with st.expander("📤 Cargar Build Detectado Previo (JSON)", expanded=False):
-        st.markdown("""
-        **¿Tienes un build detectado previamente?** 
+    # === PRE-CARGA DE DATOS ANTES DE WIDGETS ===
+    # Verificar si hay datos pendientes de carga
+    if 'build_data_to_load' in st.session_state and st.session_state.get('auto_load_build', False):
+        build_data = st.session_state.build_data_to_load
         
-        Carga el archivo JSON para rellenar automáticamente los datos y refinar la detección.
-        """)
+        # Cargar datos de entrada si existen
+        if 'datos_entrada_deteccion' in build_data:
+            entrada = build_data['datos_entrada_deteccion']
+            
+            # Pre-cargar sub-stats en session_state ANTES de crear widgets
+            if 'substats_objetivo' in entrada and entrada['substats_objetivo']:
+                for substat, value in entrada['substats_objetivo'].items():
+                    if substat in IGS_SUB_STATS and value is not None:
+                        st.session_state[f"reverse_substat_{substat}"] = int(value)
+                
+                # Activar checkbox
+                st.session_state.show_substats_reverse = True
+        
+        # Limpiar flags
+        del st.session_state.build_data_to_load
+        st.session_state.auto_load_build = False
+        st.rerun()  
+                            # Recargar página con datos
+    # ... resto del código
+    # === ENCABEZADO ATRACTIVO ===
+    st.markdown("""
+    <div style="
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 2rem;
+        border-radius: 15px;
+        text-align: center;
+        margin-bottom: 2rem;
+        box-shadow: 0 8px 32px rgba(102, 126, 234, 0.3);
+    ">
+        <h1 style="color: white; margin: 0; font-size: 2.5em;">
+            🕵️‍♂️DETECTIVE DE BUILDS
+        </h1>
+        <p style="color: rgba(255,255,255,0.9); font-size: 1.2em; margin: 0.5rem 0;">
+            🎮 ¿Viste un build increíble en el juego? ¡Descubre sus secretos!
+        </p>
+        <p style="color: rgba(255,255,255,0.8); margin: 0;">
+            Ingresa lo que puedes ver → Nosotros calculamos lo que falta
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # === FORZAR ACTIVACIÓN DE SUB-STATS SI HAY DATOS CARGADOS ===
+    # Verificar si hay sub-stats cargadas en session_state
+    substats_detectadas = any(
+        key.startswith('reverse_substat_') and st.session_state.get(key) is not None 
+        for key in st.session_state.keys()
+    )
+    
+    if substats_detectadas and not st.session_state.get('show_substats_reverse', False):
+        st.session_state.show_substats_reverse = True
+        st.info("✅ Sub-estadísticas detectadas - Activando automáticamente")
+    # === SECCIÓN DE CARGA DE BUILDS PREVIOS ===
+    with st.expander("📤 **CARGA RÁPIDA DE BUILD DETECTADO PREVIO**", expanded=False):
+        st.markdown("""
+        <div style="
+            background: linear-gradient(45deg, #ff9a9e 0%, #fecfef 100%);
+            padding: 1.5rem;
+            border-radius: 12px;
+            margin: 1rem 0;
+        ">
+            <h4 style="color: #2c3e50; margin-top: 0;">💡 ¿Ya tienes un build detectado?</h4>
+            <p style="color: #34495e; margin-bottom: 0;">
+                Carga tu archivo JSON para refinarlo o modificarlo fácilmente
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
         
         # Verificar si venimos de una recarga después de cargar un archivo
         if 'just_loaded_reverse_file' in st.session_state and st.session_state.just_loaded_reverse_file:
@@ -2718,10 +2825,10 @@ def implementar_detector_build_inverso():
             uploader_key_reverse = "reverse_build_file_uploader_v33"
         
         uploaded_reverse_file = st.file_uploader(
-            "📤 Cargar Build Detectado (.json):", 
+            "📤 **Arrastra tu archivo JSON aquí:**", 
             type=["json"], 
             key=uploader_key_reverse,
-            help="Carga un archivo JSON de un build detectado previamente para refinarlo o modificarlo"
+            help="Acepta archivos de builds detectados previamente o builds normales"
         )
         
         if uploaded_reverse_file is not None:
@@ -2754,7 +2861,22 @@ def implementar_detector_build_inverso():
                         
                         # Si es un build detectado, puede tener el peso detectado
                         if is_detected_build and 'peso' in base_profile:
-                            st.info(f"💡 Este build fue detectado con peso: **{base_profile['peso']}kg**")
+                            st.markdown(f"""
+                            <div style="
+                                background: linear-gradient(45deg, #ffecd2 0%, #fcb69f 100%);
+                                padding: 1rem;
+                                border-radius: 8px;
+                                border-left: 4px solid #ff6b35;
+                                margin: 1rem 0;
+                            ">
+                                <p style="margin: 0; color: #2c3e50;">
+                                    💡 <strong>Este build fue detectado con peso:</strong> 
+                                    <span style="color: #e74c3c; font-weight: bold; font-size: 1.2em;">
+                                        {base_profile['peso']}kg
+                                    </span>
+                                </p>
+                            </div>
+                            """, unsafe_allow_html=True)
                     
                     # Cargar nodos de habilidad
                     if 'nodos_habilidad_desbloqueados' in data_reverse_cargada:
@@ -2794,13 +2916,38 @@ def implementar_detector_build_inverso():
                                     st.session_state[f"reverse_stat_{stat}"] = value
                             st.session_state.usar_stats_finales_reverse = True
                         
-                        # Cargar sub-estadísticas si existen
+                                                # Cargar sub-estadísticas si existen (VERSIÓN CORREGIDA)
                         if 'substats_objetivo' in datos_entrada and datos_entrada['substats_objetivo']:
-                            for substat, value in datos_entrada['substats_objetivo'].items():
-                                if substat in IGS_SUB_STATS and value is not None:
-                                    st.session_state[f"reverse_substat_{substat}"] = value
+                            substats_cargadas = 0
+                            substats_info = datos_entrada['substats_objetivo']
+                            
+                            # Debug: Mostrar las substats encontradas
+                            st.info(f"🔍 DEBUG: Sub-stats encontradas: {list(substats_info.keys())}")
+                            
+                            # Primero, activar el checkbox de sub-stats
                             st.session_state.show_substats_reverse = True
-                    
+                            
+                            # Luego cargar cada sub-stat
+                            for substat, value in substats_info.items():
+                                if substat in IGS_SUB_STATS and value is not None:
+                                    try:
+                                        # Asegurar que el valor sea numérico
+                                        numeric_value = int(float(value))
+                                        st.session_state[f"reverse_substat_{substat}"] = numeric_value
+                                        substats_cargadas += 1
+                                        
+                                        # Debug: Confirmar cada carga
+                                        st.success(f"✅ Cargada: {substat} = {numeric_value}")
+                                        
+                                    except (ValueError, TypeError) as e:
+                                        st.warning(f"⚠️ Error cargando {substat}: {e}")
+                            
+                            if substats_cargadas > 0:
+                                st.success(f"✅ Se cargaron {substats_cargadas} sub-estadísticas")
+                            else:
+                                st.warning("⚠️ No se pudieron cargar sub-estadísticas válidas")
+                        else:
+                            st.info("ℹ️ No se encontraron sub-estadísticas en el archivo")
                     # Mostrar información de lo que se cargó
                     loaded_build_name_reverse = data_reverse_cargada.get("build_name", "Build Sin Nombre")
                     precision_info = ""
@@ -2808,7 +2955,22 @@ def implementar_detector_build_inverso():
                     if is_detected_build and 'precision_deteccion' in data_reverse_cargada:
                         precision_info = f" (Precisión: {data_reverse_cargada['precision_deteccion']})"
                     
-                    st.success(f"✅ Build cargado: **{loaded_build_name_reverse}**{precision_info}")
+                    st.markdown(f"""
+                    <div style="
+                        background: linear-gradient(45deg, #a8edea 0%, #fed6e3 100%);
+                        padding: 1.5rem;
+                        border-radius: 12px;
+                        border: 2px solid #2ecc71;
+                        margin: 1rem 0;
+                    ">
+                        <h4 style="color: #27ae60; margin: 0;">
+                            ✅ Build Cargado Exitosamente
+                        </h4>
+                        <p style="color: #2c3e50; margin: 0.5rem 0;">
+                            <strong>{loaded_build_name_reverse}</strong>{precision_info}
+                        </p>
+                    </div>
+                    """, unsafe_allow_html=True)
                     
                     # Mostrar resumen de lo cargado
                     col_loaded_info1, col_loaded_info2 = st.columns(2)
@@ -2816,50 +2978,185 @@ def implementar_detector_build_inverso():
                     with col_loaded_info1:
                         if 'base_profile' in data_reverse_cargada:
                             profile = data_reverse_cargada['base_profile']
-                            st.info(f"📋 Perfil: {profile.get('posicion', 'N/A')} | {profile.get('altura', 'N/A')}cm")
+                            st.markdown(f"""
+                            <div style="
+                                background: #e8f5e8;
+                                padding: 1rem;
+                                border-radius: 8px;
+                                text-align: center;
+                            ">
+                                <p style="margin: 0; color: #2c3e50;">
+                                    📋 <strong>Perfil:</strong> {profile.get('posicion', 'N/A')} | {profile.get('altura', 'N/A')}cm
+                                </p>
+                            </div>
+                            """, unsafe_allow_html=True)
                     
                     with col_loaded_info2:
                         nodos_count = len(data_reverse_cargada.get('nodos_habilidad_desbloqueados', []))
-                        st.info(f"🌳 Nodos: {nodos_count} cargados")
+                        st.markdown(f"""
+                        <div style="
+                            background: #e8f5e8;
+                            padding: 1rem;
+                            border-radius: 8px;
+                            text-align: center;
+                        ">
+                            <p style="margin: 0; color: #2c3e50;">
+                                🌳 <strong>Nodos:</strong> {nodos_count} cargados
+                            </p>
+                        </div>
+                        """, unsafe_allow_html=True)
                     
                     # Marcar flag para limpiar el uploader
                     st.session_state.just_loaded_reverse_file = True
                     
-                    st.info("🔄 La página se actualizará para mostrar los datos cargados.")
+                    st.markdown("""
+                    <div style="
+                        background: #fff3cd;
+                        padding: 1rem;
+                        border-radius: 8px;
+                        border-left: 4px solid #ffc107;
+                        margin: 1rem 0;
+                    ">
+                        <p style="margin: 0; color: #856404;">
+                            🔄 La página se actualizará para mostrar los datos cargados...
+                        </p>
+                    </div>
+                    """, unsafe_allow_html=True)
                     st.rerun()
                     
                 else:
-                    st.error("❌ El archivo no es un build detectado válido o un build normal. Verifica el formato.")
+                    st.markdown("""
+                    <div style="
+                        background: #f8d7da;
+                        padding: 1rem;
+                        border-radius: 8px;
+                        border-left: 4px solid #dc3545;
+                        margin: 1rem 0;
+                    ">
+                        <p style="margin: 0; color: #721c24;">
+                            ❌ El archivo no es un build detectado válido o un build normal. Verifica el formato.
+                        </p>
+                    </div>
+                    """, unsafe_allow_html=True)
                     
             except json.JSONDecodeError:
-                st.error("❌ Error: El archivo no es un JSON válido.")
+                st.markdown("""
+                <div style="
+                    background: #f8d7da;
+                    padding: 1rem;
+                    border-radius: 8px;
+                    border-left: 4px solid #dc3545;
+                    margin: 1rem 0;
+                ">
+                    <p style="margin: 0; color: #721c24;">
+                        ❌ Error: El archivo no es un JSON válido.
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
             except Exception as e:
-                st.error(f"❌ Error al procesar el archivo: {e}")
+                st.markdown(f"""
+                <div style="
+                    background: #f8d7da;
+                    padding: 1rem;
+                    border-radius: 8px;
+                    border-left: 4px solid #dc3545;
+                    margin: 1rem 0;
+                ">
+                    <p style="margin: 0; color: #721c24;">
+                        ❌ Error al procesar el archivo: {e}
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
     
-    st.divider()    
-    col1, col2 = st.columns(2)
+    # === SEPARADOR VISUAL ===
+    st.markdown("""
+    <div style="
+        height: 4px;
+        background: linear-gradient(90deg, #ff6b6b, #4ecdc4, #45b7d1, #96ceb4, #feca57);
+        margin: 2rem 0;
+        border-radius: 2px;
+    "></div>
+    """, unsafe_allow_html=True)
+    
+    # === TÍTULO DE SECCIÓN PRINCIPAL ===
+    st.markdown("""
+    <div style="
+        background: linear-gradient(45deg, #fa709a 0%, #fee140 100%);
+        padding: 1.5rem;
+        border-radius: 12px;
+        text-align: center;
+        margin-bottom: 1.5rem;
+    ">
+        <h2 style="color: white; margin: 0; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">
+            📋 DATOS CONOCIDOS
+        </h2>
+        <p style="color: rgba(255,255,255,0.9); margin: 0.5rem 0 0 0;">
+            Ingresa toda la información que puedes ver en el juego
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # === COLUMNAS PRINCIPALES ===
+    col1, col2 = st.columns(2, gap="large")
     
     with col1:
-        # Datos básicos
-        reverse_pos = st.selectbox("Posición:", _sorted_lp_sb_init, key="reverse_pos")
+        # === SECCIÓN: DATOS BÁSICOS ===
+        st.markdown("""
+        <div style="
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 1rem;
+            border-radius: 10px;
+            margin-bottom: 1rem;
+        ">
+            <h3 style="color: white; margin: 0; text-align: center;">
+                ⚙️ CONFIGURACIÓN BASE
+            </h3>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Datos básicos con mejor styling
+        reverse_pos = st.selectbox(
+            "🎯 **Posición del Jugador:**", 
+            _sorted_lp_sb_init, 
+            key="reverse_pos",
+            help="La posición que ves en el juego"
+        )
         
         # Altura con opciones disponibles
         idx_altura_reverse = _unique_alts_sb_init.index(180) if 180 in _unique_alts_sb_init else 0
         reverse_altura = st.selectbox(
-            "Altura (cm):", 
+            "📏 **Altura (cm):**", 
             _unique_alts_sb_init, 
             index=idx_altura_reverse,
-            key="reverse_altura"
+            key="reverse_altura",
+            help="Rangos: 160-162, 163-167, 168-172, 173-177, 178-182, 183-187, 188-192, 193-195"
         )
         
-        # Nodos conocidos organizados por árbol
-        st.markdown("**Nodos Desbloqueados (que puedes ver):**")
+        # === SECCIÓN: NODOS DE HABILIDAD ===
+        st.markdown("""
+        <div style="
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            padding: 1rem;
+            border-radius: 10px;
+            margin: 1.5rem 0 1rem 0;
+        ">
+            <h3 style="color: white; margin: 0; text-align: center;">
+                🌳 NODOS DE HABILIDAD
+            </h3>
+        </div>
+        """, unsafe_allow_html=True)
+        
         reverse_nodes = []
         
         if df_skill_trees_global is not None:
             arboles_disponibles = sorted(df_skill_trees_global['Arbol'].unique())
             
-            mostrar_selector_nodos = st.checkbox("📋 Mostrar selector de nodos por árbol", key="show_node_selector")
+            mostrar_selector_nodos = st.checkbox(
+                "📋 **Activar Selector de Nodos por Árbol**", 
+                value=True,
+                key="show_node_selector",
+                help="Marca esta casilla para poder seleccionar los nodos que ves desbloqueados en el juego"
+            )
             
             if mostrar_selector_nodos:
                 # Pre-crear el mapeo de nombres a IDs para evitar búsquedas repetidas
@@ -2871,22 +3168,52 @@ def implementar_detector_build_inverso():
                         id_nodo = nodo['ID_Nodo']
                         mapeo_nombres_ids[nombre_visible] = id_nodo
                 
-                # Botón global para limpiar
-                if st.button("🧹 Limpiar TODOS los árboles", key="clear_all_trees_reverse"):
+                # Botón global para limpiar con mejor styling
+                if st.button(
+                    "🧹 **LIMPIAR TODOS LOS ÁRBOLES**", 
+                    key="clear_all_trees_reverse",
+                    help="Elimina todas las selecciones de nodos en todos los árboles"
+                ):
                     for arbol in arboles_disponibles:
                         st.session_state[f"reverse_nodes_{arbol}"] = []
                 
                 st.markdown("---")
                 
-                # Procesar árbol por árbol sin columnas anidadas
-                for arbol in arboles_disponibles:
-                    st.markdown(f"### 🌳 **{arbol}**")
+                # Procesar árbol por árbol con mejor diseño
+                for idx, arbol in enumerate(arboles_disponibles):
+                    # Color diferente para cada árbol
+                    colores_arboles = [
+                        "linear-gradient(45deg, #667eea 0%, #764ba2 100%)",
+                        "linear-gradient(45deg, #f093fb 0%, #f5576c 100%)",
+                        "linear-gradient(45deg, #4facfe 0%, #00f2fe 100%)",
+                        "linear-gradient(45deg, #43e97b 0%, #38f9d7 100%)",
+                        "linear-gradient(45deg, #fa709a 0%, #fee140 100%)",
+                        "linear-gradient(45deg, #a8edea 0%, #fed6e3 100%)"
+                    ]
+                    color_arbol = colores_arboles[idx % len(colores_arboles)]
+                    
+                    st.markdown(f"""
+                    <div style="
+                        background: {color_arbol};
+                        padding: 1rem;
+                        border-radius: 8px;
+                        margin: 1rem 0;
+                    ">
+                        <h4 style="color: white; margin: 0; text-align: center;">
+                            🌳 {arbol.upper()}
+                        </h4>
+                    </div>
+                    """, unsafe_allow_html=True)
                     
                     # Botones de acción del árbol en una sola fila
                     col_btn1, col_btn2, col_spacer = st.columns([1, 1, 2])
                     
                     with col_btn1:
-                        if st.button("✅ Todo", key=f"select_all_{arbol}_reverse", help=f"Seleccionar todos los nodos de {arbol}"):
+                        if st.button(
+                            "✅ **Todo**", 
+                            key=f"select_all_{arbol}_reverse", 
+                            help=f"Seleccionar todos los nodos de {arbol}"
+                        ):
                             nodos_del_arbol = df_skill_trees_global[df_skill_trees_global['Arbol'] == arbol]
                             opciones_nodos = []
                             for _, nodo in nodos_del_arbol.iterrows():
@@ -2895,7 +3222,11 @@ def implementar_detector_build_inverso():
                             st.session_state[f"reverse_nodes_{arbol}"] = opciones_nodos
                     
                     with col_btn2:
-                        if st.button("❌ Limpiar", key=f"clear_all_{arbol}_reverse", help=f"Limpiar todos los nodos de {arbol}"):
+                        if st.button(
+                            "❌ **Limpiar**", 
+                            key=f"clear_all_{arbol}_reverse", 
+                            help=f"Limpiar todos los nodos de {arbol}"
+                        ):
                             st.session_state[f"reverse_nodes_{arbol}"] = []
                     
                     # Obtener nodos del árbol
@@ -2908,17 +3239,18 @@ def implementar_detector_build_inverso():
                         id_nodo = nodo['ID_Nodo']
                         opciones_nodos.append((f"{nombre_visible}", id_nodo))
                     
-                    # Multiselect con contador
+                    # Multiselect con contador y mejor descripción
                     current_selection = st.session_state.get(f"reverse_nodes_{arbol}", [])
                     nodos_seleccionados = st.multiselect(
-                        f"Nodos de {arbol} ({len(current_selection)}/{len(opciones_nodos)} seleccionados):",
+                        f"**Nodos desbloqueados en {arbol}:**",
                         options=[opcion[0] for opcion in opciones_nodos],
                         default=current_selection,
                         key=f"reverse_nodes_{arbol}",
-                        help=f"Nodos desbloqueados en {arbol}. Usa los botones '✅ Todo' o '❌ Limpiar' para selección masiva del árbol."
+                        help=f"Selecciona los nodos que ves desbloqueados en el árbol {arbol}. "
+                             f"Actualmente: {len(current_selection)}/{len(opciones_nodos)} seleccionados"
                     )
                     
-                    # CORREGIDO: Extraer los IDs de los nodos seleccionados SOLO UNA VEZ
+                    # Extraer los IDs de los nodos seleccionados
                     for nombre_seleccionado in nodos_seleccionados:
                         if nombre_seleccionado in mapeo_nombres_ids:
                             reverse_nodes.append(mapeo_nombres_ids[nombre_seleccionado])
@@ -2933,17 +3265,38 @@ def implementar_detector_build_inverso():
                                 if not node_data.empty:
                                     costo_arbol += node_data.iloc[0]['Costo']
                         
-                        # Mostrar información con colores
+                        # Mostrar información con colores y mejor diseño
                         if costo_arbol <= 40:
-                            st.success(f"🎯 Árbol {arbol}: {len(nodos_seleccionados)} nodos | {costo_arbol} puntos")
+                            color_info = "#d4edda"
+                            border_color = "#28a745"
+                            icono = "🟢"
                         elif costo_arbol <= 80:
-                            st.warning(f"🎯 Árbol {arbol}: {len(nodos_seleccionados)} nodos | {costo_arbol} puntos")
+                            color_info = "#fff3cd"
+                            border_color = "#ffc107"
+                            icono = "🟡"
                         else:
-                            st.error(f"🎯 Árbol {arbol}: {len(nodos_seleccionados)} nodos | {costo_arbol} puntos (¡Muy alto!)")
+                            color_info = "#f8d7da"
+                            border_color = "#dc3545"
+                            icono = "🔴"
+                        
+                        st.markdown(f"""
+                        <div style="
+                            background: {color_info};
+                            padding: 1rem;
+                            border-radius: 8px;
+                            border-left: 4px solid {border_color};
+                            margin: 0.5rem 0;
+                        ">
+                            <p style="margin: 0; color: #2c3e50;">
+                                {icono} <strong>Árbol {arbol}:</strong> 
+                                {len(nodos_seleccionados)} nodos | {costo_arbol} puntos
+                            </p>
+                        </div>
+                        """, unsafe_allow_html=True)
                     
                     st.markdown("---")
                 
-                # Mostrar resumen general de puntos
+                # Mostrar resumen general de puntos con mejor diseño
                 if reverse_nodes:
                     puntos_totales_nodos = 0
                     if df_skill_trees_global is not None:
@@ -2952,78 +3305,284 @@ def implementar_detector_build_inverso():
                             if not node_data.empty:
                                 puntos_totales_nodos += node_data.iloc[0]['Costo']
                     
-                    col_resumen1, col_resumen2 = st.columns(2)
+                    progreso_nodos = (puntos_totales_nodos / TOTAL_SKILL_POINTS) * 100
                     
-                    with col_resumen1:
-                        st.success(f"✅ {len(reverse_nodes)} nodos seleccionados")
+                    # Color del progreso basado en el porcentaje
+                    if progreso_nodos <= 50:
+                        color_progreso = "#28a745"
+                    elif progreso_nodos <= 80:
+                        color_progreso = "#ffc107"
+                    else:
+                        color_progreso = "#dc3545"
                     
-                    with col_resumen2:
-                        progreso_nodos = (puntos_totales_nodos / TOTAL_SKILL_POINTS) * 100
-                        st.metric(
-                            "Puntos de Nodos", 
-                            f"{puntos_totales_nodos}/{TOTAL_SKILL_POINTS}",
-                            help=f"Progreso: {progreso_nodos:.1f}% del total disponible"
-                        )
+                    st.markdown(f"""
+                    <div style="
+                        background: linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%);
+                        padding: 1.5rem;
+                        border-radius: 12px;
+                        margin: 1rem 0;
+                        text-align: center;
+                    ">
+                        <h4 style="color: #2c3e50; margin: 0;">📊 RESUMEN DE NODOS</h4>
+                        <p style="color: #2c3e50; margin: 0.5rem 0;">
+                            <strong>{len(reverse_nodes)} nodos seleccionados</strong>
+                        </p>
+                        <p style="color: #2c3e50; margin: 0;">
+                            <strong>{puntos_totales_nodos}/{TOTAL_SKILL_POINTS} puntos</strong> 
+                            ({progreso_nodos:.1f}% del total)
+                        </p>
+                    </div>
+                    """, unsafe_allow_html=True)
                     
-                    st.progress(progreso_nodos / 100, text=f"Uso de puntos: {progreso_nodos:.1f}%")
+                    # Barra de progreso visual
+                    st.markdown(f"""
+                    <div style="
+                        width: 100%;
+                        background: #e9ecef;
+                        border-radius: 10px;
+                        height: 20px;
+                        margin: 1rem 0;
+                        overflow: hidden;
+                    ">
+                        <div style="
+                            width: {progreso_nodos}%;
+                            background: {color_progreso};
+                            height: 100%;
+                            border-radius: 10px;
+                            transition: width 0.3s ease;
+                        "></div>
+                    </div>
+                    """, unsafe_allow_html=True)
             else:
-                st.info("Activa el selector para elegir nodos por árbol.")
+                st.markdown("""
+                <div style="
+                    background: #e2e3e5;
+                    padding: 1.5rem;
+                    border-radius: 10px;
+                    text-align: center;
+                    margin: 1rem 0;
+                ">
+                    <p style="margin: 0; color: #6c757d;">
+                        ℹ️ Activa el selector para elegir nodos por árbol
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
     
     with col2:
-        # Estadísticas finales opcionales
+        # === SECCIÓN: ESTADÍSTICAS ===
+        st.markdown("""
+        <div style="
+            background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
+            padding: 1rem;
+            border-radius: 10px;
+            margin-bottom: 1rem;
+        ">
+            <h3 style="color: white; margin: 0; text-align: center;">
+                📊 ESTADÍSTICAS OBSERVADAS
+            </h3>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Estadísticas finales opcionales con mejor diseño
         usar_stats_finales = st.checkbox(
-            "Usar estadísticas finales (PAC, SHO, etc.)", 
-            value=True,
+            "📈 **Usar estadísticas Generales (PAC, SHO, etc.)**", 
             key="usar_stats_finales_reverse",
-            help="Desmarca si las stats principales del juego están buggeadas o no son confiables"
+            help="Activa si puedes ver las estadísticas principales en el juego. "
+                 "Desmarca si están buggeadas o no son confiables"
         )
         
         reverse_stats = {}
         if usar_stats_finales:
-            st.markdown("**Estadísticas Finales (que ves en el juego):**")
-            for stat in ['PAC', 'SHO', 'PAS', 'DRI', 'DEF', 'PHY']:
-                reverse_stats[stat] = st.number_input(
-                    f"{stat}:", 
-                    min_value=1, 
-                    max_value=99, 
-                    value=75, 
-                    key=f"reverse_stat_{stat}"
-                )
+            st.markdown("""
+            <div style="
+                background: #e8f5e8;
+                padding: 1rem;
+                border-radius: 8px;
+                margin: 1rem 0;
+            ">
+                <h4 style="color: #2c3e50; margin: 0;">📊 Estadísticas Globales</h4>
+                <p style="color: #6c757d; margin: 0.5rem 0 0 0; font-size: 0.9em;">
+                    Ingresa los valores exactos que ves en la carta del jugador
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Crear las estadísticas en una cuadrícula 2x3
+            cols_stats = st.columns(2)
+            stats_principales = ['PAC', 'SHO', 'PAS', 'DRI', 'DEF', 'PHY']
+            
+            for idx, stat in enumerate(stats_principales):
+                with cols_stats[idx % 2]:
+                    reverse_stats[stat] = st.number_input(
+                        f"⚡ **{stat}:**", 
+                        min_value=1, 
+                        max_value=99, 
+                        value=75, 
+                        key=f"reverse_stat_{stat}",
+                        help=f"Valor de {stat} que aparece en la carta del jugador"
+                    )
         else:
-            st.info("📊 Stats principales deshabilitadas. Solo se usarán sub-estadísticas.")
+            st.markdown("""
+            <div style="
+                background: #fff3cd;
+                padding: 1rem;
+                border-radius: 8px;
+                margin: 1rem 0;
+                border-left: 4px solid #ffc107;
+            ">
+                <p style="margin: 0; color: #856404;">
+                    📊 Stats principales deshabilitadas. Solo se usarán sub-estadísticas.
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        # === SECCIÓN: SUB-ESTADÍSTICAS ===
+        st.markdown("""
+        <div style="
+            background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+            padding: 1rem;
+            border-radius: 10px;
+            margin: 1.5rem 0 1rem 0;
+        ">
+            <h3 style="color: white; margin: 0; text-align: center;">
+                🎯 SUB-ESTADÍSTICAS
+            </h3>
+        </div>
+        """, unsafe_allow_html=True)
         
         # Sub-estadísticas organizadas por categoría
         mostrar_substats = st.checkbox(
-            "📈 Usar sub-estadísticas (mayor precisión)", 
+            "🔬 **Usar sub-estadísticas (máxima precisión)**",
             key="show_substats_reverse",
-            help="Activa para ingresar sub-estadísticas específicas para mayor precisión"
+            help="Activa para ingresar sub-estadísticas específicas. "
+                 "Esto dará resultados mucho más precisos en la detección"
         )
         
         reverse_substats = {}
         if mostrar_substats:
-            st.markdown("**Sub-estadísticas (opcional - para mayor precisión):**")
+            # DEBUG: Mostrar las claves relevantes de session_state
+            st.markdown("---")
+            st.subheader("🕵️ DEBUG: Contenido de st.session_state para sub-stats (antes de inputs)")
+            relevant_ss_keys_debug = {k: v for k, v in st.session_state.items() if k.startswith("reverse_substat_")}
+            if relevant_ss_keys_debug:
+                st.json(relevant_ss_keys_debug)
+            else:
+                st.warning("No hay claves 'reverse_substat_' en st.session_state en este punto.")
+            st.markdown("---")
+            # FIN DEBUG
+            st.markdown("""
+            <div style="
+                background: #e8f4f8;
+                padding: 1rem;
+                border-radius: 8px;
+                margin: 1rem 0;
+            ">
+                <p style="color: #2c3e50; margin: 0; font-size: 0.9em;">
+                    💡 <strong>Tip:</strong> Solo completa las sub-estadísticas que puedes ver claramente. 
+                    Deja en blanco las que no conoces.
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+            
             for main_cat, sub_stats_list in SUB_STATS_MAPPING.items():
-                st.markdown(f"**{main_cat}:**")
+                # Color para cada categoría principal
+                colores_categorias = {
+                    'PAC': '#ff6b6b',
+                    'SHO': '#4ecdc4', 
+                    'PAS': '#45b7d1',
+                    'DRI': '#96ceb4',
+                    'DEF': '#feca57',
+                    'PHY': '#ff9ff3'
+                }
+                color_cat = colores_categorias.get(main_cat, '#74b9ff')
                 
-                for idx, substat in enumerate(sub_stats_list):
-                    reverse_substats[substat] = st.number_input(
-                        f"{substat}:", 
-                        min_value=0, 
-                        max_value=99, 
-                        value=None, 
-                        key=f"reverse_substat_{substat}",
-                        help=f"Sub-estadística de {main_cat}"
-                    )
+                st.markdown(f"""
+                <div style="
+                    background: {color_cat};
+                    padding: 0.8rem;
+                    border-radius: 8px;
+                    margin: 1rem 0 0.5rem 0;
+                ">
+                    <h5 style="color: white; margin: 0; text-align: center;">
+                        {main_cat}
+                    </h5>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Crear columnas para las sub-stats de esta categoría
+                num_cols = min(len(sub_stats_list), 2)
+                if num_cols > 0:
+                    cols_substats = st.columns(num_cols)
+                    
+                    for idx, substat in enumerate(sub_stats_list):
+                        with cols_substats[idx % num_cols]:
+                            reverse_substats[substat] = st.number_input(
+                                f"📊 **{substat}:**", 
+                                min_value=0, 
+                                max_value=99, 
+                                value=st.session_state.get(f"reverse_substat_{substat}", None),
+                                key=f"reverse_substat_{substat}",
+                                help=f"Sub-estadística {substat} de la categoría {main_cat}"
+                            )
+        else:
+            st.markdown("""
+            <div style="
+                background: #e2e3e5;
+                padding: 1.5rem;
+                border-radius: 10px;
+                text-align: center;
+                margin: 1rem 0;
+            ">
+                <p style="margin: 0; color: #6c757d;">
+                    🔬 Activa las sub-estadísticas para mayor precisión en la detección
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
     
-    # --- SECCIÓN 2: DETECCIÓN ---
-    st.divider()
+    # === SECCIÓN DE DETECCIÓN ===
+    st.markdown("""
+    <div style="
+        height: 4px;
+        background: linear-gradient(90deg, #667eea, #764ba2, #f093fb, #f5576c);
+        margin: 2rem 0;
+        border-radius: 2px;
+    "></div>
+    """, unsafe_allow_html=True)
     
-    # Validación
+    # Validación con mejor diseño
     tiene_datos_suficientes = reverse_nodes and (reverse_stats or any(v is not None for v in reverse_substats.values()))
     
-    if st.button("🔍 Detectar Peso e Instalaciones", key="detect_reverse_build", type="primary"):
-        if tiene_datos_suficientes:
-            with st.spinner("Analizando todas las combinaciones posibles..."):
+    if tiene_datos_suficientes:
+        st.markdown("""
+        <div style="
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 2rem;
+            border-radius: 15px;
+            text-align: center;
+            margin: 1rem 0;
+        ">
+            <h2 style="color: white; margin: 0;">
+                🚀 ¡LISTO PARA ENCONTRAR!
+            </h2>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        if st.button(
+            "🔍 **INICIAR DETECCIÓN**", 
+            key="detect_reverse_build", 
+            type="primary",
+            help="Analiza todas las combinaciones posibles para encontrar el peso exacto y las instalaciones",
+            use_container_width=True
+        ):
+            with st.spinner("🔄 Analizando todas las combinaciones posibles..."):
+                # Añadir una pequeña animación de progreso
+                progress_bar = st.progress(0)
+                for i in range(100):
+                    progress_bar.progress((i + 1))
+                    if i % 20 == 0:  # Actualizar cada 20%
+                        import time
+                        time.sleep(0.05)
+                
                 resultados = detectar_build_reverso(
                     reverse_pos, 
                     reverse_altura, 
@@ -3032,9 +3591,27 @@ def implementar_detector_build_inverso():
                     reverse_substats
                 )
                 
+                progress_bar.empty()  # Limpiar la barra de progreso
                 mostrar_resultados_deteccion(resultados, reverse_pos, reverse_altura, reverse_nodes, reverse_stats, reverse_substats)
-        else:
-            st.error("Por favor completa al menos la posición, altura, algunos nodos Y (estadísticas principales O sub-estadísticas).")
+    else:
+        st.markdown("""
+        <div style="
+            background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);
+            padding: 2rem;
+            border-radius: 15px;
+            text-align: center;
+            margin: 1rem 0;
+            border: 3px dashed #ff6b6b;
+        ">
+            <h3 style="color: #c53030; margin: 0;">
+                ⚠️ DATOS INCOMPLETOS
+            </h3>
+            <p style="color: #e53e3e; margin: 0.5rem 0 0 0;">
+                Necesitas completar: <strong>Posición + Altura + Algunos nodos</strong><br>
+                <strong>Y al menos:</strong> Estadísticas principales <strong>O</strong> sub-estadísticas
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
 def calcular_boosts_nodos(nodos_ids):
     """Calcula los boosts totales de una lista de nodos"""
     boosts = defaultdict(int)
@@ -3086,61 +3663,317 @@ def hacer_json_serializable(obj):
 
 def detectar_build_reverso(posicion, altura, stats_objetivo, nodos_conocidos, substats_objetivo=None):
     """
-    Detecta el peso y posibles instalaciones basándose en los datos conocidos
+    🕵️‍♂️ DETECTIVE DE BUILDS - Versión Corregida con Presupuesto Real
     """
     candidatos = []
+    pesos_reales = [45, 55, 69, 80, 91, 103]
+    PRESUPUESTO_MAX = 1750000
     
-    # Probar todos los pesos posibles
-    for peso in range(60, 101):  # 60-100kg
-        # Obtener stats base para esta combinación
+    st.info(f"🔍 Analizando: {posicion} + {altura}cm + {len(nodos_conocidos)} nodos (Presupuesto: ${PRESUPUESTO_MAX:,})")
+    
+    # PASO 1: Evaluar cada peso sin instalaciones primero
+    for peso in pesos_reales:
+        # Stats base + nodos
         stats_base = calcular_stats_base_jugador(posicion, altura, peso, stats_base_lb_rb, modificadores_altura, modificadores_peso, diferenciales_posicion)
         if stats_base is None:
             continue
         
-        # Calcular boosts de nodos conocidos
         boosts_nodos = calcular_boosts_nodos(nodos_conocidos)
+        stats_con_nodos = aplicar_boosts_a_stats(stats_base, boosts_nodos)
         
-        # Probar sin instalaciones
-        stats_sin_instalaciones = aplicar_boosts_a_stats(stats_base, boosts_nodos)
-        precision_sin_inst = calcular_precision_match(stats_sin_instalaciones, stats_objetivo, substats_objetivo)
+        # Comparar con objetivo
+        if substats_objetivo and any(v is not None for v in substats_objetivo.values()):
+            precision = calcular_precision_substats(stats_con_nodos, substats_objetivo)
+            diferencias = calcular_diferencias_substats(stats_con_nodos, substats_objetivo)
+        elif stats_objetivo:
+            precision = calcular_precision_stats_globales(stats_con_nodos, stats_objetivo)
+            diferencias = calcular_diferencias_stats_globales(stats_con_nodos, stats_objetivo)
+        else:
+            continue
         
-        if precision_sin_inst > 0.8:  # 80% de precisión mínima
-            candidatos.append({
-                'peso': peso,
-                'instalaciones': [],
-                'precision': precision_sin_inst,
-                'stats_calculadas': stats_sin_instalaciones,
-                'diferencias': calcular_diferencias(stats_sin_instalaciones, stats_objetivo)
-            })
+        # NUEVO: Calcular desvío máximo para análisis
+        max_desvio = max(abs(diff) for diff in diferencias.values()) if diferencias else 0
         
-        # Probar con instalaciones (las más comunes)
-        if df_instalaciones_global is not None:
-            instalaciones_comunes = obtener_instalaciones_comunes()
+        # Candidato base (sin instalaciones)
+        candidatos.append({
+            'peso': peso,
+            'instalaciones': [],
+            'precision': precision,
+            'stats_calculadas': stats_con_nodos,
+            'stats_base_puras': stats_base,
+            'diferencias': diferencias,
+            'costo_total': 0,
+            'max_desvio': max_desvio,
+            'tipo_deteccion': 'Solo Nodos'
+        })
+        
+        # PASO 2: OBLIGATORIO - Probar instalaciones si hay desvíos >= 2 puntos
+        stats_desviadas = {stat: diff for stat, diff in diferencias.items() if abs(diff) >= 2}
+        
+        if stats_desviadas:
+            st.info(f"🔧 Peso {peso}kg: Detectados desvíos de hasta {max_desvio:.0f} puntos. Probando instalaciones...")
             
-            # Probar combinaciones de instalaciones (máximo 3 para no tardar mucho)
-            from itertools import combinations
+            # Buscar combinaciones realistas de instalaciones
+            combinaciones_instalaciones = generar_combinaciones_instalaciones_realistas(stats_desviadas, PRESUPUESTO_MAX)
             
-            for num_inst in range(1, 4):  # 1, 2, o 3 instalaciones
-                for combo_instalaciones in combinations(instalaciones_comunes, num_inst):
-                    boosts_instalaciones = calcular_boosts_instalaciones(combo_instalaciones)
+            st.info(f"🧪 Probando {len(combinaciones_instalaciones)} combinaciones de instalaciones...")
+            
+            for combo_instalaciones in combinaciones_instalaciones:
+                # Calcular costo total de la combinación
+                costo_total = calcular_costo_combo_instalaciones(combo_instalaciones)
+                
+                if costo_total <= PRESUPUESTO_MAX:
+                    # Calcular boosts acumulativos
+                    boosts_instalaciones = calcular_boosts_instalaciones_acumulativo(combo_instalaciones)
                     boosts_totales = combinar_boosts(boosts_nodos, boosts_instalaciones)
+                    stats_finales = aplicar_boosts_a_stats(stats_base, boosts_totales)
                     
-                    stats_con_instalaciones = aplicar_boosts_a_stats(stats_base, boosts_totales)
-                    precision_con_inst = calcular_precision_match(stats_con_instalaciones, stats_objetivo, substats_objetivo)
+                    # Recalcular precisión
+                    if substats_objetivo and any(v is not None for v in substats_objetivo.values()):
+                        precision_con_inst = calcular_precision_substats(stats_finales, substats_objetivo)
+                        diferencias_con_inst = calcular_diferencias_substats(stats_finales, substats_objetivo)
+                    else:
+                        precision_con_inst = calcular_precision_stats_globales(stats_finales, stats_objetivo)
+                        diferencias_con_inst = calcular_diferencias_stats_globales(stats_finales, stats_objetivo)
                     
-                    if precision_con_inst > 0.85:  # Mayor precisión requerida con instalaciones
+                    # NUEVO: Calcular nuevo desvío máximo
+                    nuevo_max_desvio = max(abs(diff) for diff in diferencias_con_inst.values()) if diferencias_con_inst else 0
+                    
+                    # CRITERIO MÁS FLEXIBLE: Agregar si mejora precisión O reduce desvío máximo
+                    mejora_precision = precision_con_inst > precision + 0.02  # Reducido de 0.05 a 0.02
+                    reduce_desvio = nuevo_max_desvio < max_desvio - 1  # Reduce al menos 1 punto de desvío
+                    
+                    if mejora_precision or reduce_desvio:
                         candidatos.append({
                             'peso': peso,
-                            'instalaciones': list(combo_instalaciones),
+                            'instalaciones': combo_instalaciones,
                             'precision': precision_con_inst,
-                            'stats_calculadas': stats_con_instalaciones,
-                            'diferencias': calcular_diferencias(stats_con_instalaciones, stats_objetivo)
+                            'stats_calculadas': stats_finales,
+                            'diferencias': diferencias_con_inst,
+                            'costo_total': costo_total,
+                            'max_desvio': nuevo_max_desvio,
+                            'desvio_corregido': max_desvio - nuevo_max_desvio,
+                            'tipo_deteccion': f'{len(combo_instalaciones)} Instalaciones (${costo_total:,}) - Desvío: {nuevo_max_desvio:.0f}pts'
                         })
+                        
+                        st.success(f"✅ Mejora encontrada: Precisión {precision_con_inst:.1%} (antes {precision:.1%}), Desvío {nuevo_max_desvio:.0f}pts (antes {max_desvio:.0f}pts)")
     
-    # Ordenar por precisión
-    candidatos.sort(key=lambda x: x['precision'], reverse=True)
-    return candidatos[:10]  # Top 10 candidatos
+    # Ordenamiento inteligente usando la función existente pero mejorada
+    def calcular_score_candidato(candidato):
+        precision = candidato['precision']
+        max_desvio = candidato.get('max_desvio', 999)
+        costo = candidato.get('costo_total', 0)
+        
+        # Bonificar alta precisión
+        score_precision = precision * 100
+        
+        # Penalizar desvíos altos
+        penalizacion_desvio = max_desvio * 5
+        
+        # Bonificar corrección de desvíos
+        correccion_bonus = candidato.get('desvio_corregido', 0) * 10
+        
+        # Penalizar costo (ligeramente)
+        penalizacion_costo = costo / 100000
+        
+        score_final = score_precision + correccion_bonus - penalizacion_desvio - penalizacion_costo
+        
+        return score_final
+    
+    candidatos.sort(key=calcular_score_candidato, reverse=True)
+    return candidatos[:8]  # Top 8 candidatos
+def generar_combinaciones_instalaciones_realistas(stats_desviadas, presupuesto_max):
+    """
+    Versión corregida que respeta las instalaciones acumulativas
+    """
+    if df_instalaciones_global is None:
+        return []
+    
+    # Mapeo igual que antes...
+    mapeo_stats_instalaciones = {
+        'Acc': 'CientD', 'Spr': 'Parac', 'STR': 'SalaPes', 'STA': 'PrepFis',
+        'AGI': 'Yog', 'BAL': 'Yog', 'JUMP': 'DTequipo', 'Fin': 'EntTir',
+        'SPow': 'Tacos', 'HAcc': 'RedTenis', 'Vol': 'Rebot', 'Vis': 'AnRen',
+        'LP': 'EntPas', 'SP': 'AnRen', 'Cros': 'CanchaE', 'INT': 'EntTacDef',
+        'AWA': 'Reclu', 'STAN': 'EntEntr', 'SLID': 'EntEntr', 'REA': 'TeraD',
+        'COMP': 'TeraD', 'AGGR': 'TeraD'
+    }
+    
+    tipos_necesarios = []
+    for stat_desviada in stats_desviadas.keys():
+        if stat_desviada in mapeo_stats_instalaciones:
+            tipo_inst = mapeo_stats_instalaciones[stat_desviada]
+            if tipo_inst not in tipos_necesarios:
+                tipos_necesarios.append(tipo_inst)
+    
+    combinaciones = []
+    
+    # ESTRATEGIA CORREGIDA: Instalaciones acumulativas por tipo
+    for tipo in tipos_necesarios:
+        # Obtener TODOS los niveles de este tipo, ordenados por precio
+        instalaciones_tipo = df_instalaciones_global[
+            df_instalaciones_global['ID_Instalacion'].str.contains(tipo, na=False)
+        ].sort_values('Precio')
+        
+        # NUEVO: Generar cadenas acumulativas
+        cadena_acumulativa = []
+        costo_acumulativo = 0
+        
+        for _, instalacion in instalaciones_tipo.iterrows():
+            # Agregar esta instalación a la cadena
+            cadena_acumulativa.append(instalacion['ID_Instalacion'])
+            costo_acumulativo += instalacion['Precio']
+            
+            # Si la cadena completa cabe en el presupuesto, agregarla
+            if costo_acumulativo <= presupuesto_max:
+                combinaciones.append(cadena_acumulativa.copy())
+            else:
+                break  # No agregar más niveles de este tipo
+    
+    # ESTRATEGIA 2 CORREGIDA: Combinaciones de 2 tipos (ambos acumulativos)
+    from itertools import combinations
+    for combo_tipos in combinations(tipos_necesarios, 2):
+        # Para cada combinación de tipos, encontrar los niveles máximos acumulativos
+        instalaciones_combo = []
+        costo_total = 0
+        
+        for tipo in combo_tipos:
+            instalaciones_tipo = df_instalaciones_global[
+                df_instalaciones_global['ID_Instalacion'].str.contains(tipo, na=False)
+            ].sort_values('Precio')
+            
+            # Encontrar el nivel máximo acumulativo que podemos permitirnos
+            cadena_tipo = []
+            for _, instalacion in instalaciones_tipo.iterrows():
+                costo_con_esta = costo_total + instalacion['Precio']
+                if costo_con_esta <= presupuesto_max:
+                    cadena_tipo.append(instalacion['ID_Instalacion'])
+                    costo_total = costo_con_esta
+                else:
+                    break
+            
+            instalaciones_combo.extend(cadena_tipo)
+        
+        if instalaciones_combo:
+            combinaciones.append(instalaciones_combo)
+    
+    # ESTRATEGIA 3 CORREGIDA: 3 tipos con niveles más conservadores
+    if presupuesto_max >= 800000:
+        for combo_tipos in combinations(tipos_necesarios, min(3, len(tipos_necesarios))):
+            instalaciones_combo = []
+            costo_total = 0
+            
+            for tipo in combo_tipos:
+                instalaciones_tipo = df_instalaciones_global[
+                    df_instalaciones_global['ID_Instalacion'].str.contains(tipo, na=False)
+                ].sort_values('Precio')
+                
+                # Para 3 tipos, ser más conservador en los niveles
+                cadena_tipo = []
+                for _, instalacion in instalaciones_tipo.iterrows():
+                    costo_con_esta = costo_total + instalacion['Precio']
+                    if costo_con_esta <= presupuesto_max:
+                        cadena_tipo.append(instalacion['ID_Instalacion'])
+                        costo_total = costo_con_esta
+                    else:
+                        break
+                
+                instalaciones_combo.extend(cadena_tipo)
+            
+            if len(instalaciones_combo) > 0:
+                combinaciones.append(instalaciones_combo)
+    
+    # Eliminar duplicados y limitar
+    combinaciones_unicas = []
+    for combo in combinaciones:
+        combo_sorted = sorted(combo)
+        if combo_sorted not in combinaciones_unicas:
+            combinaciones_unicas.append(combo_sorted)
+    
+    return combinaciones_unicas[:20]
+def calcular_costo_combo_instalaciones(combo_instalaciones):
+    """Calcula el costo total de una combinación de instalaciones"""
+    costo_total = 0
+    if df_instalaciones_global is not None:
+        for inst_id in combo_instalaciones:
+            inst_data = df_instalaciones_global[df_instalaciones_global['ID_Instalacion'] == inst_id]
+            if not inst_data.empty:
+                costo_total += inst_data.iloc[0]['Precio']
+    return costo_total
 
+def calcular_boosts_instalaciones_acumulativo(instalaciones_ids):
+    """
+    Calcula boosts acumulativos correctamente.
+    Si tienes CientD_1, CientD_2, CientD_3 = suma todos los boosts
+    """
+    boosts = defaultdict(int)
+    
+    if df_instalaciones_global is not None:
+        for facility_id in instalaciones_ids:
+            facility_data = df_instalaciones_global[df_instalaciones_global['ID_Instalacion'] == facility_id]
+            if not facility_data.empty:
+                facility_info = facility_data.iloc[0]
+                for stat_col in ALL_POSSIBLE_STAT_BOOST_COLS_FACILITIES:
+                    if stat_col in facility_info.index and pd.notna(facility_info[stat_col]) and facility_info[stat_col] != 0:
+                        boosts[stat_col] += int(facility_info[stat_col])
+    
+    return dict(boosts)
+
+def calcular_precision_substats(stats_calculadas, substats_objetivo):
+    """Calcula precisión basándose solo en sub-estadísticas"""
+    total_diferencias = 0
+    total_stats = 0
+    
+    for stat, valor_objetivo in substats_objetivo.items():
+        if valor_objetivo is not None and stat in stats_calculadas:
+            diferencia = abs(stats_calculadas[stat] - valor_objetivo)
+            total_diferencias += diferencia
+            total_stats += 1
+    
+    if total_stats == 0:
+        return 0
+    
+    # Precisión más estricta para sub-stats (son más específicas)
+    precision = max(0, 1 - (total_diferencias / (total_stats * 3)))
+    return precision
+
+def calcular_diferencias_substats(stats_calculadas, substats_objetivo):
+    """Calcula diferencias solo para sub-estadísticas"""
+    diferencias = {}
+    
+    for stat, valor_objetivo in substats_objetivo.items():
+        if valor_objetivo is not None and stat in stats_calculadas:
+            diferencias[stat] = stats_calculadas[stat] - valor_objetivo
+    
+    return diferencias
+
+def calcular_precision_stats_globales(stats_calculadas, stats_objetivo):
+    """Calcula precisión basándose en stats globales (menos confiable)"""
+    total_diferencias = 0
+    total_stats = 0
+    
+    for stat, valor_objetivo in stats_objetivo.items():
+        if stat in stats_calculadas:
+            diferencia = abs(stats_calculadas[stat] - valor_objetivo)
+            total_diferencias += diferencia
+            total_stats += 1
+    
+    if total_stats == 0:
+        return 0
+    
+    # Precisión más relajada para stats globales (pueden estar buggeadas)
+    precision = max(0, 1 - (total_diferencias / (total_stats * 8)))
+    return precision
+
+def calcular_diferencias_stats_globales(stats_calculadas, stats_objetivo):
+    """Calcula diferencias solo para estadísticas globales"""
+    diferencias = {}
+    
+    for stat, valor_objetivo in stats_objetivo.items():
+        if stat in stats_calculadas:
+            diferencias[stat] = stats_calculadas[stat] - valor_objetivo
+    
+    return diferencias
 def calcular_precision_match(stats_calculadas, stats_objetivo, substats_objetivo=None):
     """
     Calcula qué tan bien coinciden las estadísticas calculadas con las objetivo
@@ -3175,41 +4008,177 @@ def mostrar_resultados_deteccion(resultados, reverse_pos, reverse_altura, revers
     Muestra los resultados de la detección de build inverso con funcionalidad mejorada
     """
     if not resultados:
-        st.error("❌ No se encontraron coincidencias. Verifica los datos ingresados.")
+        st.markdown("""
+        <div style="
+            background: linear-gradient(45deg, #ff6b6b 0%, #ee5a52 100%);
+            padding: 2rem;
+            border-radius: 12px;
+            text-align: center;
+            border: 2px solid #ff4444;
+        ">
+            <h3 style="color: white; margin: 0;">🕵️‍♂️ INVESTIGACIÓN SIN RESULTADOS</h3>
+            <p style="color: rgba(255,255,255,0.9); margin: 0.5rem 0 0 0;">
+                No se encontraron builds que coincidan con los datos proporcionados.<br>
+                Verifica que los nodos y estadísticas sean correctos.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
         return
     
-    st.success(f"✅ Se encontraron {len(resultados)} posibles configuraciones")
+    st.markdown(f"""
+    <div style="
+        background: linear-gradient(45deg, #28a745 0%, #20c997 100%);
+        padding: 2rem;
+        border-radius: 12px;
+        text-align: center;
+        border: 2px solid #28a745;
+        margin-bottom: 2rem;
+    ">
+        <h3 style="color: white; margin: 0;">🕵️‍♂️ ¡CASO RESUELTO!</h3>
+        <p style="color: rgba(255,255,255,0.9); margin: 0.5rem 0 0 0;">
+            Se encontraron <strong>{len(resultados)} configuraciones sospechosas</strong> que coinciden con las evidencias.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
     
-    # Mostrar top 3 candidatos
+    # Mostrar top 3 candidatos con mejor diseño
     for i, candidato in enumerate(resultados[:3]):
-        with st.expander(f"🎯 Candidato #{i+1} (Precisión: {candidato['precision']:.1%})", expanded=i==0):
+        # Emojis según el puesto
+        ranking_emoji = ["🥇", "🥈", "🥉"][i] if i < 3 else f"#{i+1}"
+        tipo_deteccion = candidato.get('tipo_deteccion', 'Detección Estándar')
+        costo_total = candidato.get('costo_total', 0)
+        costo_text = f" | Costo: ${costo_total:,}" if costo_total > 0 else ""
+        with st.expander(f"{ranking_emoji} **SOSPECHOSO #{i+1}** | Precisión: {candidato['precision']:.1%} | {tipo_deteccion}{costo_text}", expanded=i==0):
             col1, col2 = st.columns(2)
             
             with col1:
-                st.markdown("**Configuración Detectada:**")
-                st.metric("Peso", f"{candidato['peso']} kg")
+                st.markdown("**🔍 EVIDENCIAS ENCONTRADAS:**")
+                
+                # Información del peso con estilo detective
+                peso_emoji = "⚖️"
+                st.markdown(f"""
+                <div style="
+                    background: linear-gradient(45deg, #ffd700 0%, #ffed4e 100%);
+                    padding: 1rem;
+                    border-radius: 8px;
+                    text-align: center;
+                    margin: 1rem 0;
+                    border: 2px solid #ffd700;
+                ">
+                    <h4 style="color: #856404; margin: 0;">{peso_emoji} PESO DETECTADO</h4>
+                    <h2 style="color: #856404; margin: 0.5rem 0 0 0;">{candidato['peso']} kg</h2>
+                </div>
+                """, unsafe_allow_html=True)
                 
                 if candidato['instalaciones']:
-                    st.markdown("**Instalaciones Activas:**")
+                    st.markdown("**🏨 INSTALACIONES IDENTIFICADAS:**")
                     for inst_id in candidato['instalaciones']:
                         inst_info = df_instalaciones_global[df_instalaciones_global['ID_Instalacion'] == inst_id]
                         if not inst_info.empty:
                             nombre = inst_info.iloc[0]['Nombre_Instalacion']
-                            st.write(f"• {nombre}")
+                            precio = inst_info.iloc[0]['Precio']
+                            st.markdown(f"""
+                            <div style="
+                                background: rgba(0, 123, 255, 0.1);
+                                padding: 0.5rem;
+                                border-radius: 6px;
+                                margin: 0.3rem 0;
+                                border-left: 4px solid #007bff;
+                            ">
+                                🏨 <strong>{nombre}</strong><br>
+                                <small>💰 ${precio:,}</small>
+                            </div>
+                            """, unsafe_allow_html=True)
                 else:
-                    st.info("Sin instalaciones")
+                    st.markdown("""
+                    <div style="
+                        background: rgba(108, 117, 125, 0.1);
+                        padding: 1rem;
+                        border-radius: 8px;
+                        text-align: center;
+                        border: 2px dashed #6c757d;
+                    ">
+                        <p style="margin: 0; color: #6c757d;">
+                            🏢 <strong>Sin instalaciones detectadas</strong><br>
+                            <small>Build básico usando solo nodos de habilidad</small>
+                        </p>
+                    </div>
+                    """, unsafe_allow_html=True)
             
             with col2:
-                st.markdown("**Diferencias por Estadística:**")
-                for stat, diff in candidato['diferencias'].items():
-                    if abs(diff) <= 1:
-                        st.success(f"{stat}: ±{diff}")
-                    elif abs(diff) <= 2:
-                        st.warning(f"{stat}: ±{diff}")
+                st.markdown("**📊 ANÁLISIS DE DIFERENCIAS:**")
+                diferencias_ordenadas = sorted(candidato['diferencias'].items(), key=lambda x: abs(x[1]))
+                                # En el with col2: donde se muestran las diferencias, agrega esto antes del bucle existente:
+                
+                # NUEVO: Mostrar información de corrección de desvíos
+                if 'desvio_corregido' in candidato and candidato['desvio_corregido'] > 0:
+                    st.markdown(f"""
+                    <div style="
+                        background: linear-gradient(45deg, #28a745 0%, #20c997 100%);
+                        padding: 0.8rem;
+                        border-radius: 8px;
+                        margin: 0.5rem 0;
+                        text-align: center;
+                    ">
+                        <strong style="color: white;">
+                            🎯 CORRECCIÓN EXITOSA: -{candidato['desvio_corregido']:.1f} puntos de desvío
+                        </strong>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                # Mostrar el desvío máximo actual
+                max_desvio_actual = candidato.get('max_desvio', 0)
+                if max_desvio_actual > 0:
+                    if max_desvio_actual <= 2:
+                        color_desvio = "#28a745"
+                        nivel_desvio = "EXCELENTE"
+                    elif max_desvio_actual <= 5:
+                        color_desvio = "#ffc107"
+                        nivel_desvio = "BUENO"
                     else:
-                        st.error(f"{stat}: ±{diff}")
+                        color_desvio = "#dc3545"
+                        nivel_desvio = "NECESITA MEJORA"
+                    
+                    st.markdown(f"""
+                    <div style="
+                        background: rgba({color_desvio[1:]}, 0.1);
+                        padding: 0.5rem;
+                        border-radius: 6px;
+                        margin: 0.5rem 0;
+                        border-left: 4px solid {color_desvio};
+                    ">
+                        📏 <strong>Desvío Máximo:</strong> {max_desvio_actual:.1f} puntos <small>({nivel_desvio})</small>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                st.markdown("**📊 DIFERENCIAS POR ESTADÍSTICA:**")
+                for stat, diff in diferencias_ordenadas:
+                    if abs(diff) <= 1:
+                        color = "#28a745"
+                        icono = "✅"
+                        nivel = "EXACTO"
+                    elif abs(diff) <= 2:
+                        color = "#ffc107"
+                        icono = "⚠️"
+                        nivel = "CERCA"
+                    else:
+                        color = "#dc3545"
+                        icono = "❌"
+                        nivel = "DESVIADO"
+                    
+                    st.markdown(f"""
+                    <div style="
+                        background: rgba({color[1:]}, 0.1);
+                        padding: 0.5rem;
+                        border-radius: 6px;
+                        margin: 0.3rem 0;
+                        border-left: 4px solid {color};
+                    ">
+                        {icono} <strong>{stat}:</strong> ±{diff} <small>({nivel})</small>
+                    </div>
+                    """, unsafe_allow_html=True)
             
-            # Botones en columnas
+            # Botones de acción mejorados
             col_recrear, col_descargar = st.columns(2)
             
             with col_recrear:
@@ -3271,11 +4240,11 @@ Instalaciones: {len(candidato['instalaciones'])} activas
                         """)
             
             with col_descargar:
-                # Código de descarga (sin cambios - funciona bien)
+                # ===== BOTÓN DE DESCARGA COMPLETO =====
                 build_detectado = {
                     "app_version": f"{APP_VERSION}_build_detectado",
                     "build_name": f"Build_Detectado_{reverse_pos}_{reverse_altura}cm_{candidato['peso']}kg",
-                    "metodo_deteccion": "Detector_Reverso",
+                    "metodo_deteccion": "Detective_Builds",
                     "precision_deteccion": f"{candidato['precision']:.1%}",
                     "base_profile": {
                         "posicion": str(reverse_pos),
@@ -3299,7 +4268,7 @@ Instalaciones: {len(candidato['instalaciones'])} activas
                     file_name = f"Build_Detectado_{reverse_pos}_{reverse_altura}cm_{candidato['peso']}kg_FC25.json"
                     
                     st.download_button(
-                        label="💾 Descargar",
+                        label="💾 **Descargar JSON**",
                         data=build_json,
                         file_name=file_name,
                         mime="application/json",
@@ -3308,7 +4277,7 @@ Instalaciones: {len(candidato['instalaciones'])} activas
                         use_container_width=True
                     )
                 except Exception as e:
-                    st.error(f"Error al generar descarga: {e}")
+                    st.error(f"❌ Error al generar descarga: {e}")
 def obtener_instalaciones_comunes():
     """
     Obtiene las instalaciones más comúnmente usadas para probar
