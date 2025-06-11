@@ -13,7 +13,7 @@ import numpy as np
 STAR_EMOJI = "⭐" 
 
 # --- Configuración de la Página de Streamlit ---
-st.set_page_config(page_title="Calculadora Stats FC25 v3.6", layout="wide") 
+st.set_page_config(page_title="FC Pro Clubs Builder v3.6", layout="wide") 
 
 # --- Definiciones Constantes ---
 APP_VERSION = "v3.6" 
@@ -1353,7 +1353,7 @@ else:
     st.stop()
 
 # --- Interfaz de Usuario con Streamlit ---
-st.title(f"Calculadora Avanzada de Estadísticas FC25 ({APP_VERSION})")
+st.title(f"FC Pro Clubs Builder ({APP_VERSION})")
 PLAYER_COLORS = ['rgba(0,100,255,0.7)', 'rgba(220,50,50,0.7)', 'rgba(0,170,0,0.7)'] 
 PLAYER_FILL_COLORS = [color.replace('0.7', '0.3') for color in PLAYER_COLORS]
 
@@ -1379,51 +1379,16 @@ def styled_metric(label, value):
         <div style="font-size: 0.8em; {"color: #555555;" if bg_color == "inherit" else ""}">{label}</div>
         <div style="font-size: 1.7em; font-weight: bold;">{value}</div></div>""", unsafe_allow_html=True)
 
-# --- Selectores de Perfil Base para Build Craft en la Barra Lateral ---
-st.sidebar.markdown("--- \n ### 🛠️ Perfil Base para Build Craft:")
-idx_pos_sidebar_v32 = _sorted_lp_sb_init.index(st.session_state.bc_pos) if st.session_state.bc_pos in _sorted_lp_sb_init else 0
-st.session_state.bc_pos = st.sidebar.selectbox("Posición Base (BC):", _sorted_lp_sb_init, index=idx_pos_sidebar_v32, key="sb_bc_pos_v33") 
-idx_alt_sidebar_v32 = _unique_alts_sb_init.index(st.session_state.bc_alt) if st.session_state.bc_alt in _unique_alts_sb_init else 0
-st.session_state.bc_alt = st.sidebar.selectbox("Altura Base (cm) (BC):", _unique_alts_sb_init, index=idx_alt_sidebar_v32, key="sb_bc_alt_v33") 
-idx_pes_sidebar_v32 = _unique_pesos_sb_init.index(st.session_state.bc_pes) if st.session_state.bc_pes in _unique_pesos_sb_init else 0
-st.session_state.bc_pes = st.sidebar.selectbox("Peso Base (kg) (BC):", _unique_pesos_sb_init, index=idx_pes_sidebar_v32, key="sb_bc_pes_v33") 
-st.sidebar.markdown("---")
-st.session_state.apply_facility_boosts_toggle = st.sidebar.checkbox("Aplicar Boosts de Instalaciones del Club", 
-                                                                    value=st.session_state.get('apply_facility_boosts_toggle', True), 
-                                                                    key="facility_boost_toggle_v33") 
-# En la barra lateral, después de los selectores de perfil base, agregar:
-st.sidebar.markdown("---")
-st.sidebar.markdown("### 📊 Estado del Build:")
-
-puntos_usados_sidebar = TOTAL_SKILL_POINTS - st.session_state.bc_points_remaining
-progreso_puntos = (puntos_usados_sidebar / TOTAL_SKILL_POINTS) * 100
-
-st.sidebar.metric("Puntos Usados", f"{puntos_usados_sidebar}/{TOTAL_SKILL_POINTS}")
-st.sidebar.metric("Progreso Build", f"{progreso_puntos:.1f}%")
-
-# Barra de progreso visual
-st.sidebar.progress(progreso_puntos / 100)
-
-# Información adicional si hay instalaciones
-if st.session_state.unlocked_facility_levels:
-    costo_instalaciones_sidebar = 0
-    if df_instalaciones_global is not None:
-        for facility_id in st.session_state.unlocked_facility_levels:
-            facility_data = df_instalaciones_global[df_instalaciones_global['ID_Instalacion'] == facility_id]
-            if not facility_data.empty:
-                costo_instalaciones_sidebar += facility_data.iloc[0]['Precio']
-    
-    st.sidebar.metric("💰 Gastado en Instalaciones", f"${costo_instalaciones_sidebar:,}")
 
 # Definición de Pestañas
 tab_calc, tab_build_craft, tab_facilities, tab_explorer, tab_best_combo, tab_filters, tab_reverse = st.tabs([
-    "🧮 Calculadora", "🛠️ Build Craft", "🏨 Instalaciones Club", 
+    "🧮 Comparador", "🛠️ Build Craft", "🏨 Instalaciones Club", 
     "🔎 Explorador Mejoras", "🔍 Búsqueda Óptima", "📊 Filtros Múltiples", "🕵️‍♂️ Detective de Builds"
 ])
 
 # --- Pestaña: Calculadora y Comparador ---
 with tab_calc: 
-    st.header("Calculadora de Estadísticas y Comparador (Stats Base)")
+    st.header("Comparador de Perfiles (Stats Base)")
     num_players_to_compare_calc = st.radio("Jugadores a definir/comparar:", (1, 2, 3), index=0, horizontal=True, key="num_players_radio_v33_calc") 
     cols_selectors_calc = st.columns(num_players_to_compare_calc)
     player_stats_list_base_calc, player_configs_base_calc = [], []
@@ -1572,12 +1537,38 @@ with tab_calc:
             
     else: 
         st.warning("Datos para el Top 5 (base) no disponibles.")
+
+
+
     # --- Pestaña: Build Craft ---
 with tab_build_craft:
+    # --- Selectores de Perfil Base para Build Craft en la Barra Lateral ---
+    st.markdown("### 🛠️ Perfil Base para Build Craft")
+    # Agrupar selectores en una fila de 3 columnas
+    col_pos, col_alt, col_pes = st.columns(3)
+    with col_pos:
+        idx_pos_sidebar_v32 = _sorted_lp_sb_init.index(st.session_state.bc_pos) if st.session_state.bc_pos in _sorted_lp_sb_init else 0
+        st.session_state.bc_pos = st.selectbox("Posición", _sorted_lp_sb_init, index=idx_pos_sidebar_v32, key="sb_bc_pos_v33")
+    with col_alt:
+        idx_alt_sidebar_v32 = _unique_alts_sb_init.index(st.session_state.bc_alt) if st.session_state.bc_alt in _unique_alts_sb_init else 0
+        st.session_state.bc_alt = st.selectbox("Altura (cm)", _unique_alts_sb_init, index=idx_alt_sidebar_v32, key="sb_bc_alt_v33")
+    with col_pes:
+        idx_pes_sidebar_v32 = _unique_pesos_sb_init.index(st.session_state.bc_pes) if st.session_state.bc_pes in _unique_pesos_sb_init else 0
+        st.session_state.bc_pes = st.selectbox("Peso (kg)", _unique_pesos_sb_init, index=idx_pes_sidebar_v32, key="sb_bc_pes_v33")
+
+    # Checkbox y métricas en una fila
+    col_chk, col_pts, col_prog, col_cost = st.columns([2,1,1,1])
+    with col_chk:
+        st.session_state.apply_facility_boosts_toggle = st.checkbox(
+            "Aplicar Boosts de Instalaciones del Club",
+            value=st.session_state.get('apply_facility_boosts_toggle', True),
+            key="facility_boost_toggle_v33"
+        )
+
     if not carga_completa_exitosa: 
         st.error("Faltan datos para el Build Craft.")
     else:
-        st.info(f"DEBUG (Build Craft): Pos={st.session_state.get('bc_pos')}, Alt={st.session_state.get('bc_alt')}, Pes={st.session_state.get('bc_pes')}")
+       
         jugador_base_actual_bc = calcular_stats_base_jugador(st.session_state.bc_pos, st.session_state.bc_alt, st.session_state.bc_pes, stats_base_lb_rb, modificadores_altura, modificadores_peso, diferenciales_posicion)
         if jugador_base_actual_bc is None:
             st.error("ERROR CRÍTICO (Build Craft): No se pudieron calcular las stats base para el perfil actual. Las stats se mostrarán en cero.")
@@ -2158,7 +2149,7 @@ with tab_facilities:
                 with cols_facilities_fac[idx_fac_loop % num_facility_cols_disp_fac]:
                     with st.container(border=True):
                         st.markdown(f"**{level_data_fac['Nombre_Instalacion']}**")
-                        st.caption(f"Costo: {level_data_fac['Precio']:,} | ID: {level_id_fac_item}")
+                        st.caption(f"Costo: {level_data_fac['Precio']:,}")
                         prereq_fac_val_item = level_data_fac.get('Prerrequisito', '') 
                         prereq_fac_display_item = f"Prerreq: {prereq_fac_val_item if str(prereq_fac_val_item).strip() else 'Ninguno'}" 
                         st.caption(prereq_fac_display_item)
